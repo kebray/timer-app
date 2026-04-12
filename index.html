@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Nap Timer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #e8b84b;
+    --green: #4ecb71;
+    --red: #e85454;
+    --bg: #1a1a2e;
+    --text: #f0e6d3;
+    --dim: #7a7a8a;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* --- Phase label --- */
+  #phase-label {
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    transition: color 0.4s;
+  }
+
+  /* --- Clock ring --- */
+  .clock-container {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .glow-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 4px solid var(--gold);
+    box-shadow: 0 0 30px rgba(232, 184, 75, 0.3), inset 0 0 30px rgba(232, 184, 75, 0.1);
+    transition: border-color 0.4s, box-shadow 0.4s;
+  }
+  .glow-ring.over {
+    border-color: var(--green);
+    box-shadow: 0 0 30px rgba(78, 203, 113, 0.3), inset 0 0 30px rgba(78, 203, 113, 0.1);
+  }
+  .glow-ring.alarm {
+    border-color: var(--red);
+    box-shadow: 0 0 40px rgba(232, 84, 84, 0.5), inset 0 0 30px rgba(232, 84, 84, 0.15);
+    animation: pulse-ring 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 30px rgba(232, 84, 84, 0.4), inset 0 0 30px rgba(232, 84, 84, 0.1); }
+    50% { box-shadow: 0 0 50px rgba(232, 84, 84, 0.7), inset 0 0 40px rgba(232, 84, 84, 0.2); }
+  }
+
+  /* --- Clock display --- */
+  #clock-display {
+    font-size: 4rem;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    transition: color 0.4s;
+    z-index: 1;
+  }
+
+  /* --- Scroll wheel (setup phase) --- */
+  #scroll-area {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    cursor: ns-resize;
+    z-index: 2;
+  }
+
+  /* --- Lap badge --- */
+  #lap-badge {
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    height: 1.4em;
+    transition: color 0.4s;
+  }
+
+  /* --- Buttons --- */
+  .btn-row {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+  }
+
+  .btn {
+    padding: 0.7rem 1.8rem;
+    border: 2px solid var(--gold);
+    border-radius: 2rem;
+    background: transparent;
+    color: var(--gold);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+  }
+  .btn:active { background: var(--gold); color: var(--bg); }
+  .btn.primary { background: var(--gold); color: var(--bg); }
+  .btn.primary:active { opacity: 0.8; }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:active { background: var(--red); color: var(--bg); }
+  .btn.dismiss { border-color: var(--green); color: var(--green); }
+  .btn.dismiss:active { background: var(--green); color: var(--bg); }
+
+  .btn:disabled { opacity: 0.3; pointer-events: none; }
+
+  .hidden { display: none !important; }
+
+  /* --- Phase dot --- */
+  #phase-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-top: 2rem;
+    transition: background 0.4s;
+  }
+
+  /* --- Progress ring (SVG behind the clock) --- */
+  .progress-ring {
+    position: absolute;
+    inset: -6px;
+    z-index: 0;
+  }
+  .progress-ring circle {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke 0.4s;
+  }
+  .progress-ring .track { stroke: rgba(255,255,255,0.05); }
+  .progress-ring .fill {
+    stroke: var(--gold);
+    transform: rotate(-90deg);
+    transform-origin: center;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.4s;
+  }
+</style>
+</head>
+<body>
+
+<div id="phase-label">set your nap</div>
+
+<div class="clock-container">
+  <div class="glow-ring" id="glow-ring"></div>
+  <svg class="progress-ring" id="progress-ring" viewBox="0 0 292 292">
+    <circle class="track" cx="146" cy="146" r="140"/>
+    <circle class="fill" id="progress-fill" cx="146" cy="146" r="140"/>
+  </svg>
+  <div id="clock-display">05:00</div>
+  <div id="scroll-area"></div>
+</div>
+
+<div id="lap-badge">&nbsp;</div>
+
+<div class="btn-row" id="setup-btns">
+  <button class="btn primary" id="btn-start">Start</button>
+</div>
+
+<div class="btn-row hidden" id="running-btns">
+  <button class="btn danger" id="btn-stop">Stop Timer</button>
+</div>
+
+<div class="btn-row hidden" id="alarm-btns">
+  <button class="btn dismiss" id="btn-dismiss">Dismiss</button>
+  <button class="btn danger" id="btn-stop-alarm">Stop Timer</button>
+</div>
+
+<div id="phase-dot"></div>
+
+<script>
+(function () {
+  // --- State ---
+  let minutes = 5;
+  let totalSeconds = 0;
+  let elapsed = 0;
+  let timerInterval = null;
+  let phase = 'setup'; // setup | running | over | alarm
+  let alarmTimeout = null;
+  let alarmRepeatInterval = null;
+  let audioCtx = null;
+  let wakeLock = null;
+  let lapCount = 0;
+  let alarmSounding = false;
+
+  // --- Elements ---
+  const display = document.getElementById('clock-display');
+  const label = document.getElementById('phase-label');
+  const badge = document.getElementById('lap-badge');
+  const ring = document.getElementById('glow-ring');
+  const dot = document.getElementById('phase-dot');
+  const scrollArea = document.getElementById('scroll-area');
+  const progressFill = document.getElementById('progress-fill');
+  const setupBtns = document.getElementById('setup-btns');
+  const runningBtns = document.getElementById('running-btns');
+  const alarmBtns = document.getElementById('alarm-btns');
+
+  // --- Progress ring setup ---
+  const circumference = 2 * Math.PI * 140;
+  progressFill.style.strokeDasharray = circumference;
+  progressFill.style.strokeDashoffset = circumference;
+
+  function setProgress(fraction) {
+    const offset = circumference * (1 - Math.min(1, Math.max(0, fraction)));
+    progressFill.style.strokeDashoffset = offset;
+  }
+
+  // --- Format time ---
+  function fmt(sec) {
+    const abs = Math.abs(sec);
+    const m = Math.floor(abs / 60);
+    const s = abs % 60;
+    const prefix = sec < 0 ? '+' : '';
+    return prefix + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  // --- Display update ---
+  function render() {
+    if (phase === 'setup') {
+      display.textContent = fmt(minutes * 60);
+      display.style.color = 'var(--text)';
+      label.textContent = 'set your nap';
+      label.style.color = 'var(--gold)';
+      badge.innerHTML = '&nbsp;';
+      ring.className = 'glow-ring';
+      dot.style.background = 'var(--gold)';
+      progressFill.style.stroke = 'var(--gold)';
+      setProgress(0);
+      setupBtns.classList.remove('hidden');
+      runningBtns.classList.add('hidden');
+      alarmBtns.classList.add('hidden');
+      scrollArea.classList.remove('hidden');
+    } else {
+      scrollArea.classList.add('hidden');
+      setupBtns.classList.add('hidden');
+
+      const remaining = totalSeconds - elapsed;
+
+      if (remaining > 0) {
+        // Counting down
+        display.textContent = fmt(remaining);
+        display.style.color = 'var(--gold)';
+        label.textContent = 'resting';
+        label.style.color = 'var(--gold)';
+        ring.className = 'glow-ring';
+        dot.style.background = 'var(--gold)';
+        progressFill.style.stroke = 'var(--gold)';
+        setProgress(elapsed / totalSeconds);
+        badge.innerHTML = '&nbsp;';
+        runningBtns.classList.remove('hidden');
+        alarmBtns.classList.add('hidden');
+      } else {
+        // Over time
+        const overSec = -remaining;
+        display.textContent = fmt(-overSec);
+        lapCount = Math.floor(overSec / totalSeconds);
+
+        if (alarmSounding) {
+          display.style.color = 'var(--red)';
+          label.textContent = "wake up";
+          label.style.color = 'var(--red)';
+          ring.className = 'glow-ring alarm';
+          dot.style.background = 'var(--red)';
+          progressFill.style.stroke = 'var(--red)';
+          runningBtns.classList.add('hidden');
+          alarmBtns.classList.remove('hidden');
+        } else {
+          display.style.color = 'var(--green)';
+          label.textContent = "time's up";
+          label.style.color = 'var(--green)';
+          ring.className = 'glow-ring over';
+          dot.style.background = 'var(--green)';
+          progressFill.style.stroke = 'var(--green)';
+          runningBtns.classList.remove('hidden');
+          alarmBtns.classList.add('hidden');
+        }
+
+        // Progress wraps each interval
+        const intervalProgress = (overSec % totalSeconds) / totalSeconds;
+        setProgress(intervalProgress);
+
+        if (lapCount >= 1) {
+          badge.textContent = lapCount + '\u00d7 over';
+          badge.style.color = alarmSounding ? 'var(--red)' : 'var(--green)';
+        } else {
+          badge.innerHTML = '&nbsp;';
+        }
+      }
+    }
+  }
+
+  // --- Audio ---
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function playChime() {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + i * 0.25);
+      gain.gain.linearRampToValueAtTime(0.3, now + i * 0.25 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.25 + 0.8);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.25);
+      osc.stop(now + i * 0.25 + 0.8);
+    });
+  }
+
+  function startAlarmSound() {
+    alarmSounding = true;
+    playChime();
+    alarmRepeatInterval = setInterval(playChime, 3000);
+  }
+
+  function stopAlarmSound() {
+    alarmSounding = false;
+    if (alarmRepeatInterval) { clearInterval(alarmRepeatInterval); alarmRepeatInterval = null; }
+  }
+
+  // --- Wake Lock ---
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (e) { /* graceful fail */ }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  }
+  // Re-acquire on visibility change
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && phase !== 'setup') requestWakeLock();
+  });
+
+  // --- Timer controls ---
+  function startTimer() {
+    totalSeconds = minutes * 60;
+    elapsed = 0;
+    lapCount = 0;
+    phase = 'running';
+    stopAlarmSound();
+
+    requestWakeLock();
+
+    // Schedule first alarm
+    scheduleNextAlarm();
+
+    timerInterval = setInterval(() => {
+      elapsed++;
+      render();
+    }, 1000);
+
+    render();
+  }
+
+  function scheduleNextAlarm() {
+    if (alarmTimeout) clearTimeout(alarmTimeout);
+
+    const remaining = totalSeconds - elapsed;
+    const nextAlarmIn = remaining > 0
+      ? remaining
+      : totalSeconds - ((elapsed - totalSeconds) % totalSeconds);
+
+    alarmTimeout = setTimeout(() => {
+      triggerAlarm();
+    }, nextAlarmIn * 1000);
+  }
+
+  function triggerAlarm() {
+    startAlarmSound();
+    render();
+    // Schedule next alarm at next interval
+    alarmTimeout = setTimeout(() => {
+      triggerAlarm();
+    }, totalSeconds * 1000);
+  }
+
+  function dismissAlarm() {
+    stopAlarmSound();
+    render();
+  }
+
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (alarmTimeout) { clearTimeout(alarmTimeout); alarmTimeout = null; }
+    stopAlarmSound();
+    releaseWakeLock();
+    phase = 'setup';
+    render();
+  }
+
+  // --- Scroll wheel input ---
+  let touchStartY = null;
+  let touchAccum = 0;
+
+  function adjustMinutes(delta) {
+    minutes = Math.max(1, Math.min(90, minutes + delta));
+    render();
+  }
+
+  scrollArea.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -1 : 1;
+    adjustMinutes(delta);
+  }, { passive: false });
+
+  scrollArea.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+    touchAccum = 0;
+  }, { passive: true });
+
+  scrollArea.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    const diff = touchStartY - y;
+    touchAccum += diff;
+    touchStartY = y;
+    const step = 20; // pixels per minute
+    while (touchAccum >= step) { adjustMinutes(1); touchAccum -= step; }
+    while (touchAccum <= -step) { adjustMinutes(-1); touchAccum += step; }
+  }, { passive: false });
+
+  // Mouse drag on scroll area
+  let mouseDown = false;
+  let mouseStartY = 0;
+  let mouseAccum = 0;
+
+  scrollArea.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    mouseStartY = e.clientY;
+    mouseAccum = 0;
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!mouseDown) return;
+    const diff = mouseStartY - e.clientY;
+    mouseAccum += diff;
+    mouseStartY = e.clientY;
+    const step = 20;
+    while (mouseAccum >= step) { adjustMinutes(1); mouseAccum -= step; }
+    while (mouseAccum <= -step) { adjustMinutes(-1); mouseAccum += step; }
+  });
+
+  window.addEventListener('mouseup', () => { mouseDown = false; });
+
+  // --- Button handlers ---
+  document.getElementById('btn-start').addEventListener('click', startTimer);
+  document.getElementById('btn-stop').addEventListener('click', stopTimer);
+  document.getElementById('btn-dismiss').addEventListener('click', dismissAlarm);
+  document.getElementById('btn-stop-alarm').addEventListener('click', stopTimer);
+
+  // --- Init ---
+  render();
+})();
+</script>
+</body>
+</html>
