@@ -832,6 +832,7 @@
       <p class="about-tagline">A snooze timer for activity timing.</p>
       <div class="about-version" id="about-version">v0.0.0 (dev)</div>
       <button class="btn" id="btn-show-changelog">View Changelog</button>
+      <button class="btn" id="btn-check-updates">Check for Updates</button>
       <a class="about-link" href="https://github.com/kebray/timer-app" target="_blank" rel="noreferrer noopener">View source on GitHub</a>
     </div>
   </section>
@@ -2104,6 +2105,17 @@
   }
   function closeChangelog() { changelogModal.classList.add('hidden'); }
   document.getElementById('btn-show-changelog').addEventListener('click', openChangelog);
+  document.getElementById('btn-check-updates').addEventListener('click', () => {
+    // Same effect as the pull-to-refresh gesture. We also poke the service
+    // worker so it pulls a fresh sw.js (and any new asset cache) before the
+    // reload, otherwise a stale SW could still serve cached HTML.
+    if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg && reg.update) { try { reg.update(); } catch (_) {} }
+      }).catch(() => {});
+    }
+    location.reload();
+  });
   document.getElementById('btn-changelog-close').addEventListener('click', closeChangelog);
   changelogModal.addEventListener('click', (e) => {
     if (e.target === changelogModal) closeChangelog();
