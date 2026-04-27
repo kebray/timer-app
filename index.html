@@ -54,10 +54,19 @@
   }
   .screen.active { display: flex; }
 
-  /* Timer + About center their content. Settings is top-anchored + scrollable. */
   /* Bottom padding has to clear the fixed footer (~60px) AND the iOS home-
      indicator safe-area, otherwise content sits under the tab bar. */
-  #screen-timer, #screen-about {
+  /* The Timer screen is top-aligned: when content (clock + totals + buttons
+     + snooze + apply) is taller than the viewport (e.g. iPhone Pro Max in
+     portrait + Safari toolbars), top-align lets it scroll properly. With
+     center-justify, overflow gets clipped both above and below. About is
+     short enough to stay center-justified. Settings is naturally tall. */
+  #screen-timer {
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1.25rem 1rem calc(5.5rem + env(safe-area-inset-bottom, 0));
+  }
+  #screen-about {
     align-items: center;
     justify-content: center;
     padding: 1rem 1rem calc(5rem + env(safe-area-inset-bottom, 0));
@@ -655,19 +664,25 @@
 
   /* --- Mobile: bump font sizes a notch since there's room. --- */
   @media (max-width: 480px) {
-    #phase-label { font-size: 1.25rem; margin-bottom: 1.4rem; }
-    .timer-original { font-size: 0.9rem; }
+    #phase-label { font-size: 1.25rem; margin-bottom: 1rem; }
+    .timer-original { font-size: 0.9rem; margin-bottom: 0.9rem; }
     #clock-display { font-size: 4.5rem; }
     #clock-display.with-hours { font-size: 3.4rem; }
     .time-segment { font-size: 2.7rem; }
     .seg-label { font-size: 0.8rem; }
-    .adjust-hint { font-size: 0.85rem; }
-    .total-line { font-size: 0.95rem; }
+    .adjust-hint { font-size: 0.85rem; margin-top: 0.5rem; }
+    .total-line { font-size: 0.95rem; margin-top: 0.3rem; }
     .snooze-label { font-size: 0.85rem; }
     .snooze-segment { font-size: 1.6rem; }
     .snooze-colon { font-size: 1.6rem; }
     .chip { font-size: 0.9rem; padding: 0.4rem 0.8rem; }
     #snooze-pending-flag { font-size: 0.8rem; }
+    /* Tighten vertical rhythm so the timer screen fits without scroll on
+       most modern phones (Pro-Max-class included). Apply / Cancel still
+       wraps if needed via .btn-row's flex-wrap. */
+    .btn-row { margin-top: 1.25rem; }
+    .divider { margin: 1.1rem 0 0.25rem; }
+    #snooze-section { margin-top: 0.4rem; gap: 0.35rem; }
   }
 </style>
 </head>
