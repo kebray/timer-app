@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Nap Timer</title>
+<title>App Timer</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -50,20 +50,18 @@
     justify-content: center;
   }
 
+  /* Atmospheric outer/inner glow only — the visible ring is the SVG progress ring. */
   .glow-ring {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    border: 4px solid var(--gold);
-    box-shadow: 0 0 30px rgba(232, 184, 75, 0.3), inset 0 0 30px rgba(232, 184, 75, 0.1);
-    transition: border-color 0.4s, box-shadow 0.4s;
+    box-shadow: 0 0 30px rgba(232, 184, 75, 0.25), inset 0 0 30px rgba(232, 184, 75, 0.08);
+    transition: box-shadow 0.4s;
   }
   .glow-ring.over {
-    border-color: var(--green);
     box-shadow: 0 0 30px rgba(78, 203, 113, 0.3), inset 0 0 30px rgba(78, 203, 113, 0.1);
   }
   .glow-ring.alarm {
-    border-color: var(--red);
     box-shadow: 0 0 40px rgba(232, 84, 84, 0.5), inset 0 0 30px rgba(232, 84, 84, 0.15);
     animation: pulse-ring 1s ease-in-out infinite;
   }
@@ -73,7 +71,7 @@
     50% { box-shadow: 0 0 50px rgba(232, 84, 84, 0.7), inset 0 0 40px rgba(232, 84, 84, 0.2); }
   }
 
-  /* --- Clock display --- */
+  /* --- Clock display (running phase) --- */
   #clock-display {
     font-size: 4rem;
     font-weight: 300;
@@ -82,6 +80,82 @@
     transition: color 0.4s;
     z-index: 1;
   }
+  #clock-display.with-hours { font-size: 3rem; }
+
+  /* --- Setup display (editable HH:MM:SS segments) --- */
+  #setup-display {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.05em;
+    z-index: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .seg-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .seg-label {
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.12em;
+    text-transform: lowercase;
+    margin-bottom: 0.2rem;
+    transition: color 0.15s;
+  }
+  .time-segment {
+    font-size: 2.4rem;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    padding: 0.05em 0.2em;
+    border-radius: 0.15em;
+    color: var(--text);
+    cursor: text;
+    outline: none;
+    transition: background 0.15s, color 0.15s;
+    min-width: 1.6em;
+    text-align: center;
+  }
+  .time-segment:hover { background: rgba(232, 184, 75, 0.1); }
+  .time-segment:focus,
+  .time-segment.editing {
+    background: var(--gold);
+    color: var(--bg);
+  }
+  .time-segment:focus + .seg-label,
+  .seg-group:has(.time-segment:focus) .seg-label { color: var(--gold); }
+  .seg-colon {
+    font-size: 2.4rem;
+    font-weight: 300;
+    color: var(--text);
+    padding-bottom: 0.05em;
+    align-self: flex-end;
+  }
+
+  /* --- Inner reset button (visible during countdown only) --- */
+  .center-btn {
+    position: absolute;
+    top: 70%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    padding: 0;
+    transition: background 0.15s, color 0.15s, opacity 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .center-btn:hover { background: rgba(232, 184, 75, 0.12); }
+  .center-btn:active { background: var(--gold); color: var(--bg); }
+  .center-btn svg { display: block; }
 
   /* --- Scroll wheel (setup phase) --- */
   #scroll-area {
@@ -89,16 +163,17 @@
     inset: 0;
     border-radius: 50%;
     cursor: ns-resize;
-    z-index: 2;
+    z-index: 1;
   }
+  #setup-display { position: relative; z-index: 2; }
+  #clock-display { position: relative; z-index: 2; }
 
-  /* --- Lap badge --- */
-  #lap-badge {
+  .adjust-hint {
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
     margin-top: 0.75rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    height: 1.4em;
-    transition: color 0.4s;
+    text-align: center;
   }
 
   /* --- Buttons --- */
@@ -129,17 +204,19 @@
 
   .btn:disabled { opacity: 0.3; pointer-events: none; }
 
-  .hidden { display: none !important; }
-
-  /* --- Phase dot --- */
-  #phase-dot {
-    width: 8px;
-    height: 8px;
+  /* Icon-only round button variant for Pause/Stop. */
+  .btn.icon-only {
+    width: 56px;
+    height: 56px;
+    padding: 0;
     border-radius: 50%;
-    background: var(--gold);
-    margin-top: 2rem;
-    transition: background 0.4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
+  .btn.icon-only svg { display: block; }
+
+  .hidden { display: none !important; }
 
   /* --- Progress ring (SVG behind the clock) --- */
   .progress-ring {
@@ -149,22 +226,267 @@
   }
   .progress-ring circle {
     fill: none;
-    stroke-width: 3;
+    stroke-width: 8;
     stroke-linecap: round;
     transition: stroke 0.4s;
   }
-  .progress-ring .track { stroke: rgba(255,255,255,0.05); }
+  .progress-ring .track { stroke: rgba(255,255,255,0.14); }
   .progress-ring .fill {
     stroke: var(--gold);
     transform: rotate(-90deg);
     transform-origin: center;
     transition: stroke-dashoffset 0.5s linear, stroke 0.4s;
   }
+
+  /* --- Gear (settings) button --- */
+  .gear-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(232, 184, 75, 0.4);
+    background: transparent;
+    color: var(--gold);
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    transition: background 0.2s, border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gear-btn:hover { background: rgba(232, 184, 75, 0.1); border-color: var(--gold); }
+  .gear-btn:active { background: var(--gold); color: var(--bg); }
+
+  /* --- Original timer value (running phase) --- */
+  .timer-original {
+    margin-top: -0.8rem;
+    margin-bottom: 1.2rem;
+    font-size: 0.78rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-original .v { color: var(--text); font-weight: 500; }
+
+  /* --- Total time labels (snooze phase) --- */
+  .total-line {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .total-line .v { color: var(--text); font-weight: 500; }
+
+  /* --- Divider between buttons and snooze section --- */
+  .divider {
+    width: 80%;
+    max-width: 320px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 1.75rem 0 0.25rem;
+  }
+
+  /* --- Snooze interval section --- */
+  #snooze-section {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 360px;
+  }
+  .snooze-label {
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .snooze-display {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+  .snooze-segment {
+    font-size: 1.4rem;
+    font-weight: 400;
+    padding: 0.05em 0.25em;
+    border-radius: 0.15em;
+    color: var(--text);
+    cursor: text;
+    outline: none;
+    min-width: 1.5em;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .snooze-segment:hover { background: rgba(232, 184, 75, 0.1); }
+  .snooze-segment:focus { background: var(--gold); color: var(--bg); }
+  .snooze-colon {
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: var(--text);
+    padding-bottom: 0.05em;
+  }
+  #snooze-pending-flag {
+    font-size: 0.7rem;
+    color: var(--gold);
+    margin-left: 0.4rem;
+    font-style: italic;
+  }
+
+  /* --- Chip row --- */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .chip {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgba(232, 184, 75, 0.4);
+    background: transparent;
+    color: var(--gold);
+    border-radius: 1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip:hover { border-color: var(--gold); }
+  .chip.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+
+  /* --- Modal --- */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .modal-card {
+    background: #232340;
+    border: 1px solid rgba(232, 184, 75, 0.3);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    max-width: 420px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  .modal-title {
+    font-size: 1.2rem;
+    margin-bottom: 1.2rem;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+  }
+  .settings-section {
+    margin-bottom: 1.5rem;
+  }
+  .settings-section h3 {
+    font-size: 0.85rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.6rem;
+    font-weight: 500;
+  }
+  .hms-input {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.7rem;
+    cursor: ns-resize;
+  }
+  .hms-seg {
+    display: inline-block;
+    width: 2.4em;
+    padding: 0.4rem 0.3rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.25rem;
+    color: var(--text);
+    font-size: 1rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    cursor: text;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hms-seg:hover { border-color: rgba(232, 184, 75, 0.5); }
+  .hms-seg:focus { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+  .hms-colon { color: var(--dim); padding: 0 0.05rem; }
+  .settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .settings-toggle input { cursor: pointer; }
+  .chip-config-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+  .chip-config-row .chip-num {
+    font-size: 0.8rem;
+    color: var(--dim);
+    width: 1.2em;
+  }
+  .settings-error {
+    color: var(--red);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  .modal-actions .btn { padding: 0.5rem 1.2rem; font-size: 0.9rem; }
+
+  /* --- Mobile: bump font sizes a notch since there's room. --- */
+  @media (max-width: 480px) {
+    #phase-label { font-size: 1.25rem; margin-bottom: 1.4rem; }
+    .timer-original { font-size: 0.9rem; }
+    #clock-display { font-size: 4.5rem; }
+    #clock-display.with-hours { font-size: 3.4rem; }
+    .time-segment { font-size: 2.7rem; }
+    .seg-label { font-size: 0.8rem; }
+    .adjust-hint { font-size: 0.85rem; }
+    .total-line { font-size: 0.95rem; }
+    .snooze-label { font-size: 0.85rem; }
+    .snooze-segment { font-size: 1.6rem; }
+    .snooze-colon { font-size: 1.6rem; }
+    .chip { font-size: 0.9rem; padding: 0.4rem 0.8rem; }
+    #snooze-pending-flag { font-size: 0.8rem; }
+  }
 </style>
 </head>
 <body>
 
-<div id="phase-label">set your nap</div>
+<button class="gear-btn" id="btn-settings" aria-label="Settings" title="Settings">&#9881;</button>
+
+<div id="phase-label">set your timer</div>
+<div class="timer-original hidden" id="timer-original">Timer: <span class="v" id="timer-original-val">00:00</span></div>
 
 <div class="clock-container">
   <div class="glow-ring" id="glow-ring"></div>
@@ -172,53 +494,245 @@
     <circle class="track" cx="146" cy="146" r="140"/>
     <circle class="fill" id="progress-fill" cx="146" cy="146" r="140"/>
   </svg>
-  <div id="clock-display">05:00</div>
+  <div id="setup-display">
+    <div class="seg-group">
+      <div class="seg-label">hr</div>
+      <span class="time-segment" id="seg-hr" tabindex="0" data-unit="hr" inputmode="numeric">00</span>
+    </div>
+    <span class="seg-colon">:</span>
+    <div class="seg-group">
+      <div class="seg-label">min</div>
+      <span class="time-segment" id="seg-min" tabindex="0" data-unit="min" inputmode="numeric">05</span>
+    </div>
+    <span class="seg-colon">:</span>
+    <div class="seg-group">
+      <div class="seg-label">sec</div>
+      <span class="time-segment" id="seg-sec" tabindex="0" data-unit="sec" inputmode="numeric">00</span>
+    </div>
+  </div>
+  <div id="clock-display" class="hidden">05:00</div>
+  <button class="center-btn hidden" id="btn-reset-inner" aria-label="Reset timer" title="Reset">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-3-6.7"/>
+      <path d="M21 4v5h-5"/>
+    </svg>
+  </button>
   <div id="scroll-area"></div>
 </div>
 
-<div id="lap-badge">&nbsp;</div>
+<div class="adjust-hint" id="adjust-hint">tap to type · scroll or drag any segment to adjust</div>
+
+<div class="total-line hidden" id="total-time-line">Total Time: <span class="v" id="total-time-val">00:00</span></div>
+<div class="total-line hidden" id="total-snooze-line">Total Snooze: <span class="v" id="total-snooze-val">00:00</span></div>
 
 <div class="btn-row" id="setup-btns">
   <button class="btn primary" id="btn-start">Start</button>
 </div>
 
 <div class="btn-row hidden" id="running-btns">
-  <button class="btn danger" id="btn-stop">Stop Timer</button>
+  <button class="btn icon-only" id="btn-pause" aria-label="Pause" title="Pause"></button>
+  <button class="btn danger icon-only" id="btn-stop" aria-label="Stop Timer" title="Stop Timer">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+  </button>
 </div>
 
 <div class="btn-row hidden" id="alarm-btns">
   <button class="btn dismiss" id="btn-dismiss">Dismiss</button>
-  <button class="btn danger" id="btn-stop-alarm">Stop Timer</button>
+  <button class="btn danger icon-only" id="btn-stop-alarm" aria-label="Stop Timer" title="Stop Timer">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+  </button>
 </div>
 
-<div id="phase-dot"></div>
+<div class="divider" id="snooze-divider"></div>
+
+<div id="snooze-section">
+  <div class="snooze-label">Snooze alarm every <span id="snooze-pending-flag" class="hidden">(pending)</span></div>
+  <div class="snooze-display">
+    <span class="snooze-segment" id="snooze-hr" tabindex="0" data-snu="hr" inputmode="numeric">00</span>
+    <span class="snooze-colon">:</span>
+    <span class="snooze-segment" id="snooze-min" tabindex="0" data-snu="min" inputmode="numeric">05</span>
+    <span class="snooze-colon">:</span>
+    <span class="snooze-segment" id="snooze-sec" tabindex="0" data-snu="sec" inputmode="numeric">00</span>
+  </div>
+  <div class="chip-row" id="chip-row"></div>
+</div>
+
+<div class="btn-row hidden" id="apply-btn-row">
+  <button class="btn" id="btn-cancel-apply">Cancel</button>
+  <button class="btn primary" id="btn-apply">Apply New Snooze</button>
+</div>
+
+<div class="modal-backdrop hidden" id="settings-modal">
+  <div class="modal-card">
+    <div class="modal-title">Settings</div>
+
+    <section class="settings-section">
+      <h3>Default timer</h3>
+      <div class="hms-input" id="set-def-tmr-mount"></div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="set-use-last-tmr">
+        <span>Use last-used timer value instead</span>
+      </label>
+      <div class="settings-error hidden" id="default-tmr-error"></div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Default snooze interval</h3>
+      <div class="hms-input" id="set-def-snooze-mount"></div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="set-use-last-snooze">
+        <span>Use last-used snooze interval instead</span>
+      </label>
+      <div class="settings-error hidden" id="default-error"></div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Quick chip values (must be increasing, &ge; 5s)</h3>
+      <div id="chip-config-list"></div>
+      <div class="settings-error hidden" id="chips-error"></div>
+    </section>
+
+    <div class="modal-actions">
+      <button class="btn" id="btn-settings-cancel">Cancel</button>
+      <button class="btn primary" id="btn-settings-save">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
+  // --- Constants ---
+  const MAX_SECONDS = 99 * 3600 + 59 * 60 + 59; // 99:59:59
+  const MIN_SNOOZE_SECONDS = 5; // snooze intervals can't go below 5 seconds
+
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+  const ICON_PLAY  = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><polygon points="7 4 19 12 7 20"/></svg>';
+  const SETTINGS_KEY = 'app-timer-settings';
+  const DEFAULT_SETTINGS = {
+    defaultTimer: 300,           // 5 min (main timer)
+    useLastUsedTimer: false,
+    lastUsedTimer: 300,
+    defaultSnooze: 300,          // 5 min (snooze alarm interval)
+    useLastUsedSnooze: false,
+    lastUsedSnooze: 300,
+    chips: [120, 300, 600, 900, 1200] // 2, 5, 10, 15, 20 min
+  };
+
+  // --- Settings (loaded from localStorage) ---
+  let settings = loadSettings();
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Migration: prior versions named these "overtime"; copy onto the new
+        // "snooze" keys so existing user settings survive the rename.
+        if (parsed.defaultSnooze === undefined && parsed.defaultOvertime !== undefined) {
+          parsed.defaultSnooze = parsed.defaultOvertime;
+        }
+        if (parsed.lastUsedSnooze === undefined && parsed.lastUsedSnooze !== undefined) {
+          parsed.lastUsedSnooze = parsed.lastUsedSnooze;
+        }
+        if (parsed.useLastUsedSnooze === undefined && parsed.useLastUsed !== undefined) {
+          parsed.useLastUsedSnooze = parsed.useLastUsed;
+        }
+        const merged = Object.assign({}, DEFAULT_SETTINGS, parsed);
+        // Defensive: make sure chips is a valid array of 5 ints
+        if (!Array.isArray(merged.chips) || merged.chips.length !== 5) {
+          merged.chips = DEFAULT_SETTINGS.chips.slice();
+        }
+        return merged;
+      }
+    } catch (e) { /* fall through */ }
+    return Object.assign({}, DEFAULT_SETTINGS, { chips: DEFAULT_SETTINGS.chips.slice() });
+  }
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+  function getInitialSnooze() {
+    if (settings.useLastUsedSnooze && settings.lastUsedSnooze >= MIN_SNOOZE_SECONDS) {
+      return settings.lastUsedSnooze;
+    }
+    return Math.max(MIN_SNOOZE_SECONDS, settings.defaultSnooze);
+  }
+  function getInitialTimerSeconds() {
+    if (settings.useLastUsedTimer && settings.lastUsedTimer >= 1) {
+      return settings.lastUsedTimer;
+    }
+    return Math.max(1, settings.defaultTimer || 300);
+  }
+
   // --- State ---
-  let minutes = 5;
+  let setupSeconds = getInitialTimerSeconds();
   let totalSeconds = 0;
   let elapsed = 0;
   let timerInterval = null;
-  let phase = 'setup'; // setup | running | over | alarm
+  let phase = 'setup'; // setup | running
+  let paused = false;
   let alarmTimeout = null;
   let alarmRepeatInterval = null;
   let audioCtx = null;
+  let activeOscillators = [];
   let wakeLock = null;
-  let lapCount = 0;
   let alarmSounding = false;
+  let editBuffer = '';
+  let snoozeEditBuffer = '';
+
+  // --- Snooze state ---
+  let snoozeActive = getInitialSnooze();
+  let snoozePending = snoozeActive;
+  let lastAlarmAtElapsed = 0; // when the most recent alarm fired (in elapsed seconds)
 
   // --- Elements ---
   const display = document.getElementById('clock-display');
+  const setupDisplay = document.getElementById('setup-display');
   const label = document.getElementById('phase-label');
-  const badge = document.getElementById('lap-badge');
   const ring = document.getElementById('glow-ring');
-  const dot = document.getElementById('phase-dot');
   const scrollArea = document.getElementById('scroll-area');
   const progressFill = document.getElementById('progress-fill');
   const setupBtns = document.getElementById('setup-btns');
   const runningBtns = document.getElementById('running-btns');
   const alarmBtns = document.getElementById('alarm-btns');
+  const applyBtnRow = document.getElementById('apply-btn-row');
+  const adjustHint = document.getElementById('adjust-hint');
+  const segHr = document.getElementById('seg-hr');
+  const segMin = document.getElementById('seg-min');
+  const segSec = document.getElementById('seg-sec');
+  // Snooze UI
+  const snoozeSection = document.getElementById('snooze-section');
+  const snoozeHr = document.getElementById('snooze-hr');
+  const snoozeMin = document.getElementById('snooze-min');
+  const snoozeSec = document.getElementById('snooze-sec');
+  const snoozePendingFlag = document.getElementById('snooze-pending-flag');
+  const chipRow = document.getElementById('chip-row');
+  // Total lines
+  const totalTimeLine = document.getElementById('total-time-line');
+  const totalSnoozeLine = document.getElementById('total-snooze-line');
+  const totalTimeVal = document.getElementById('total-time-val');
+  const totalSnoozeVal = document.getElementById('total-snooze-val');
+  // Original-timer line
+  const timerOriginal = document.getElementById('timer-original');
+  const timerOriginalVal = document.getElementById('timer-original-val');
+  // Pause button
+  const btnPause = document.getElementById('btn-pause');
+  // Inner reset button (shown only during countdown, before any alarm)
+  const btnResetInner = document.getElementById('btn-reset-inner');
+  // Settings modal
+  const settingsModal = document.getElementById('settings-modal');
+  const setDefTmrMount = document.getElementById('set-def-tmr-mount');
+  const setDefSnoozeMount = document.getElementById('set-def-snooze-mount');
+  const setUseLastSnooze = document.getElementById('set-use-last-snooze');
+  const setUseLastTmr = document.getElementById('set-use-last-tmr');
+  const chipConfigList = document.getElementById('chip-config-list');
+  const chipsError = document.getElementById('chips-error');
+  const defaultError = document.getElementById('default-error');
+  const defaultTmrError = document.getElementById('default-tmr-error');
+  // Picker instances are built lazily on first openSettings.
+  let pickerDefaultTimer = null;
+  let pickerDefaultSnooze = null;
+  let chipPickers = [];
+  let pickersBuilt = false;
 
   // --- Progress ring setup ---
   const circumference = 2 * Math.PI * 140;
@@ -231,86 +745,316 @@
   }
 
   // --- Format time ---
-  function fmt(sec) {
+  // forceHours: render HH:MM:SS even when h===0 (so a long countdown keeps a stable layout).
+  function fmt(sec, forceHours) {
     const abs = Math.abs(sec);
-    const m = Math.floor(abs / 60);
+    const h = Math.floor(abs / 3600);
+    const m = Math.floor((abs % 3600) / 60);
     const s = abs % 60;
     const prefix = sec < 0 ? '+' : '';
+    if (forceHours || h > 0) {
+      return prefix + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
     return prefix + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function getParts(total) {
+    return {
+      hr: Math.floor(total / 3600),
+      min: Math.floor((total % 3600) / 60),
+      sec: total % 60
+    };
+  }
+
+  function chipLabel(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0 && m === 0 && s === 0) return h + 'h';
+    if (h > 0 && s === 0) return h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+    if (m > 0 && s === 0) return m + 'm';
+    if (m > 0) return m + 'm ' + s + 's';
+    return s + 's';
+  }
+
+  function renderSegments() {
+    const p = getParts(setupSeconds);
+    [['hr', segHr], ['min', segMin], ['sec', segSec]].forEach(([unit, el]) => {
+      const txt = String(p[unit]).padStart(2, '0');
+      if (el.textContent !== txt) el.textContent = txt;
+    });
+  }
+
+  function renderSnoozeSegments() {
+    const p = getParts(snoozePending);
+    [['hr', snoozeHr], ['min', snoozeMin], ['sec', snoozeSec]].forEach(([unit, el]) => {
+      const txt = String(p[unit]).padStart(2, '0');
+      if (el.textContent !== txt) el.textContent = txt;
+    });
+  }
+
+  function renderChips() {
+    chipRow.innerHTML = '';
+    settings.chips.forEach(secs => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip';
+      btn.textContent = chipLabel(secs);
+      if (secs === snoozePending) btn.classList.add('active');
+      btn.addEventListener('click', () => setSnoozePending(secs));
+      chipRow.appendChild(btn);
+    });
+  }
+
+  // Generic HMS segmented picker with click-to-type AND drag/scroll-to-adjust.
+  // Used for all the time inputs in the settings modal.
+  // Returns { getValue(), setValue(secs) }.
+  function buildHmsPicker(container, opts) {
+    opts = opts || {};
+    const minVal = opts.min || 0;
+    const maxVal = opts.max || MAX_SECONDS;
+    let value = Math.min(maxVal, Math.max(minVal, opts.initial || 0));
+    let buffer = '';
+
+    container.innerHTML = '';
+
+    function makeSeg(unit) {
+      const el = document.createElement('span');
+      el.className = 'hms-seg';
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('inputmode', 'numeric');
+      el.dataset.hmsUnit = unit;
+      return el;
+    }
+    function makeColon() {
+      const el = document.createElement('span');
+      el.className = 'hms-colon';
+      el.textContent = ':';
+      return el;
+    }
+    const segHr = makeSeg('hr');
+    const segMin = makeSeg('min');
+    const segSec = makeSeg('sec');
+    container.append(segHr, makeColon(), segMin, makeColon(), segSec);
+
+    function clamp(v, allowSubMin) {
+      if (allowSubMin) return Math.min(maxVal, Math.max(0, v));
+      return Math.min(maxVal, Math.max(minVal, v));
+    }
+    function refresh() {
+      const p = getParts(value);
+      const tHr = String(p.hr).padStart(2, '0');
+      const tMin = String(p.min).padStart(2, '0');
+      const tSec = String(p.sec).padStart(2, '0');
+      if (segHr.textContent !== tHr) segHr.textContent = tHr;
+      if (segMin.textContent !== tMin) segMin.textContent = tMin;
+      if (segSec.textContent !== tSec) segSec.textContent = tSec;
+    }
+    function setVal(v, opts2) {
+      opts2 = opts2 || {};
+      value = clamp(v, opts2.allowSubMin);
+      refresh();
+    }
+    function setUnit(unit, val) {
+      const p = getParts(value);
+      p[unit] = val;
+      setVal(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+    }
+
+    function attach(el, unit) {
+      el.addEventListener('focus', () => { buffer = ''; });
+      el.addEventListener('blur', () => {
+        buffer = '';
+        if (value < minVal) { value = minVal; refresh(); }
+      });
+      el.addEventListener('keydown', (e) => {
+        const key = e.key;
+        if (key >= '0' && key <= '9') {
+          e.preventDefault();
+          buffer += key;
+          if (buffer.length > 2) buffer = buffer.slice(-2);
+          let v = parseInt(buffer, 10);
+          const cap = unit === 'hr' ? 99 : 59;
+          if (v > cap) v = cap;
+          setUnit(unit, v);
+          if (buffer.length === 2) {
+            const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+            if (next) { buffer = ''; next.focus(); }
+          }
+        } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+          e.preventDefault();
+          const step = stepForUnit(unit);
+          setVal(value + (key === 'ArrowUp' ? step : -step));
+          buffer = '';
+        } else if (key === 'ArrowLeft') {
+          e.preventDefault();
+          const prev = unit === 'sec' ? segMin : unit === 'min' ? segHr : null;
+          if (prev) prev.focus();
+        } else if (key === 'ArrowRight') {
+          e.preventDefault();
+          const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+          if (next) next.focus();
+        } else if (key === 'Tab') {
+          buffer = '';
+        } else if (key === 'Enter') {
+          e.preventDefault();
+          el.blur();
+        } else if (key === 'Backspace' || key === 'Delete') {
+          e.preventDefault();
+          buffer = '';
+          setUnit(unit, 0);
+        }
+      });
+    }
+    attach(segHr, 'hr');
+    attach(segMin, 'min');
+    attach(segSec, 'sec');
+
+    bindDragInput(container, {
+      isEnabled: () => true,
+      onAdjust: (d) => setVal(value + d),
+      getStep: (t) => (t && t.dataset && t.dataset.hmsUnit) ? stepForUnit(t.dataset.hmsUnit) : 1,
+      isFocusableTap: (t) => t && t.classList && t.classList.contains('hms-seg')
+    });
+
+    refresh();
+    return {
+      getValue: () => value,
+      setValue: (v) => setVal(v)
+    };
   }
 
   // --- Display update ---
   function render() {
+    // Always reflect current snooze-interval state in chips/segments
+    renderSnoozeSegments();
+    renderChips();
+
     if (phase === 'setup') {
-      display.textContent = fmt(minutes * 60);
-      display.style.color = 'var(--text)';
-      label.textContent = 'set your nap';
+      setupDisplay.classList.remove('hidden');
+      display.classList.add('hidden');
+      renderSegments();
+      label.textContent = 'set your timer';
       label.style.color = 'var(--gold)';
-      badge.innerHTML = '&nbsp;';
       ring.className = 'glow-ring';
-      dot.style.background = 'var(--gold)';
       progressFill.style.stroke = 'var(--gold)';
-      setProgress(0);
+      setProgress(1); // full ring during setup (the timer hasn't started draining)
       setupBtns.classList.remove('hidden');
       runningBtns.classList.add('hidden');
       alarmBtns.classList.add('hidden');
+      applyBtnRow.classList.add('hidden');
       scrollArea.classList.remove('hidden');
+      adjustHint.classList.remove('hidden');
+      snoozeSection.classList.remove('hidden');
+      snoozePendingFlag.classList.add('hidden');
+      totalTimeLine.classList.add('hidden');
+      totalSnoozeLine.classList.add('hidden');
+      timerOriginal.classList.add('hidden');
+      btnResetInner.classList.add('hidden');
+      return;
+    }
+
+    // running phase (countdown OR snooze)
+    setupDisplay.classList.add('hidden');
+    display.classList.remove('hidden');
+    scrollArea.classList.add('hidden');
+    adjustHint.classList.add('hidden');
+    setupBtns.classList.add('hidden');
+    snoozeSection.classList.remove('hidden');
+
+    // Show the original timer value so it's visible at all times once running.
+    timerOriginalVal.textContent = fmt(totalSeconds, totalSeconds >= 3600);
+    timerOriginal.classList.remove('hidden');
+
+    // Pause button: pause icon while running, play icon while paused.
+    btnPause.innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
+    btnPause.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+    btnPause.setAttribute('title', paused ? 'Resume' : 'Pause');
+
+    const remaining = totalSeconds - elapsed;
+    const inSnooze = remaining <= 0;
+
+    if (!inSnooze) {
+      // Counting down to zero
+      const showHrs = totalSeconds >= 3600;
+      display.classList.toggle('with-hours', showHrs);
+      display.textContent = fmt(remaining, showHrs);
+      display.style.color = 'var(--gold)';
+      label.textContent = 'running';
+      label.style.color = 'var(--gold)';
+      ring.className = 'glow-ring';
+      progressFill.style.stroke = 'var(--gold)';
+      // Drain as time passes: yellow ring shrinks from full to empty.
+      setProgress(remaining / totalSeconds);
+      runningBtns.classList.remove('hidden');
+      alarmBtns.classList.add('hidden');
+      applyBtnRow.classList.add('hidden');
+      snoozePendingFlag.classList.add('hidden');
+      totalTimeLine.classList.add('hidden');
+      totalSnoozeLine.classList.add('hidden');
+      // Inner reset is visible only during countdown (before the first alarm).
+      btnResetInner.classList.remove('hidden');
+      return;
+    }
+
+    // Snooze: main center shows COUNTDOWN to next alarm
+    const nextAlarmAt = lastAlarmAtElapsed + snoozeActive;
+    const nextAlarmIn = Math.max(0, nextAlarmAt - elapsed);
+    const showHrs = snoozeActive >= 3600 || nextAlarmIn >= 3600;
+    display.classList.toggle('with-hours', showHrs);
+    display.textContent = fmt(nextAlarmIn, showHrs);
+
+    // Total Time and Total Snooze below the clock
+    const overSec = elapsed - totalSeconds;
+    const totalShowHrs = elapsed >= 3600;
+    totalTimeVal.textContent = fmt(elapsed, totalShowHrs);
+    totalSnoozeVal.textContent = fmt(overSec, overSec >= 3600);
+    totalTimeLine.classList.remove('hidden');
+    totalSnoozeLine.classList.remove('hidden');
+
+    if (alarmSounding) {
+      display.style.color = 'var(--red)';
+      label.textContent = 'alarm';
+      label.style.color = 'var(--red)';
+      ring.className = 'glow-ring alarm';
+      progressFill.style.stroke = 'var(--red)';
+      runningBtns.classList.add('hidden');
+      alarmBtns.classList.remove('hidden');
     } else {
-      scrollArea.classList.add('hidden');
-      setupBtns.classList.add('hidden');
+      display.style.color = 'var(--green)';
+      label.textContent = 'snoozing';
+      label.style.color = 'var(--green)';
+      ring.className = 'glow-ring over';
+      progressFill.style.stroke = 'var(--green)';
+      runningBtns.classList.remove('hidden');
+      alarmBtns.classList.add('hidden');
+    }
 
-      const remaining = totalSeconds - elapsed;
+    // Progress ring drains across the current snooze cycle.
+    const cycleElapsed = elapsed - lastAlarmAtElapsed;
+    const cycleRemaining = Math.max(0, snoozeActive - cycleElapsed);
+    const cycleFraction = snoozeActive > 0
+      ? Math.min(1, Math.max(0, cycleRemaining / snoozeActive))
+      : 0;
+    setProgress(cycleFraction);
 
-      if (remaining > 0) {
-        // Counting down
-        display.textContent = fmt(remaining);
-        display.style.color = 'var(--gold)';
-        label.textContent = 'resting';
-        label.style.color = 'var(--gold)';
-        ring.className = 'glow-ring';
-        dot.style.background = 'var(--gold)';
-        progressFill.style.stroke = 'var(--gold)';
-        setProgress(elapsed / totalSeconds);
-        badge.innerHTML = '&nbsp;';
-        runningBtns.classList.remove('hidden');
-        alarmBtns.classList.add('hidden');
-      } else {
-        // Over time
-        const overSec = -remaining;
-        display.textContent = fmt(-overSec);
-        lapCount = Math.floor(overSec / totalSeconds);
+    // Apply button: only when there's a pending change to the interval
+    if (snoozePending !== snoozeActive) {
+      applyBtnRow.classList.remove('hidden');
+      snoozePendingFlag.classList.remove('hidden');
+    } else {
+      applyBtnRow.classList.add('hidden');
+      snoozePendingFlag.classList.add('hidden');
+    }
 
-        if (alarmSounding) {
-          display.style.color = 'var(--red)';
-          label.textContent = "wake up";
-          label.style.color = 'var(--red)';
-          ring.className = 'glow-ring alarm';
-          dot.style.background = 'var(--red)';
-          progressFill.style.stroke = 'var(--red)';
-          runningBtns.classList.add('hidden');
-          alarmBtns.classList.remove('hidden');
-        } else {
-          display.style.color = 'var(--green)';
-          label.textContent = "time's up";
-          label.style.color = 'var(--green)';
-          ring.className = 'glow-ring over';
-          dot.style.background = 'var(--green)';
-          progressFill.style.stroke = 'var(--green)';
-          runningBtns.classList.remove('hidden');
-          alarmBtns.classList.add('hidden');
-        }
+    // Once any alarm has fired we're in snooze — hide the inner reset.
+    btnResetInner.classList.add('hidden');
 
-        // Progress wraps each interval
-        const intervalProgress = (overSec % totalSeconds) / totalSeconds;
-        setProgress(intervalProgress);
-
-        if (lapCount >= 1) {
-          badge.textContent = lapCount + '\u00d7 over';
-          badge.style.color = alarmSounding ? 'var(--red)' : 'var(--green)';
-        } else {
-          badge.innerHTML = '&nbsp;';
-        }
-      }
+    // Paused state overrides the phase label so it's clearly visible.
+    if (paused) {
+      label.textContent = 'paused';
+      label.style.color = 'var(--gold)';
     }
   }
 
@@ -336,10 +1080,17 @@
       gain.connect(ctx.destination);
       osc.start(now + i * 0.25);
       osc.stop(now + i * 0.25 + 0.8);
+      const entry = { osc, gain };
+      activeOscillators.push(entry);
+      osc.onended = () => {
+        const idx = activeOscillators.indexOf(entry);
+        if (idx >= 0) activeOscillators.splice(idx, 1);
+      };
     });
   }
 
   function startAlarmSound() {
+    stopAlarmSound();
     alarmSounding = true;
     playChime();
     alarmRepeatInterval = setInterval(playChime, 3000);
@@ -348,6 +1099,26 @@
   function stopAlarmSound() {
     alarmSounding = false;
     if (alarmRepeatInterval) { clearInterval(alarmRepeatInterval); alarmRepeatInterval = null; }
+    // Aggressively silence anything in flight: cancel scheduled gain ramps,
+    // zero out gain, stop oscillators, and disconnect — so even queued chime
+    // tones go silent immediately.
+    if (audioCtx) {
+      const t = audioCtx.currentTime;
+      activeOscillators.forEach(({ osc, gain }) => {
+        try {
+          gain.gain.cancelScheduledValues(t);
+          gain.gain.setValueAtTime(0, t);
+          osc.stop(t);
+          osc.disconnect();
+          gain.disconnect();
+        } catch (e) { /* already stopped */ }
+      });
+    }
+    activeOscillators = [];
+    if (audioCtx) {
+      try { audioCtx.close(); } catch (e) {}
+      audioCtx = null;
+    }
   }
 
   // --- Wake Lock ---
@@ -369,15 +1140,30 @@
 
   // --- Timer controls ---
   function startTimer() {
-    totalSeconds = minutes * 60;
+    // Commit any in-progress segment edits
+    const ae = document.activeElement;
+    if (ae && (ae.classList.contains('time-segment') || ae.classList.contains('snooze-segment'))) {
+      ae.blur();
+    }
+    if (setupSeconds < 1) { setupSeconds = 1; render(); return; }
+
+    totalSeconds = setupSeconds;
     elapsed = 0;
-    lapCount = 0;
+    lastAlarmAtElapsed = 0;
+    paused = false;
+
+    // Persist what the user actually started with as the "last used" timer value.
+    settings.lastUsedTimer = setupSeconds;
+
+    // Lock in the snooze interval choice
+    snoozeActive = Math.max(MIN_SNOOZE_SECONDS, snoozePending);
+    snoozePending = snoozeActive;
+    settings.lastUsedSnooze = snoozeActive;
+    saveSettings();
+
     phase = 'running';
     stopAlarmSound();
-
     requestWakeLock();
-
-    // Schedule first alarm
     scheduleNextAlarm();
 
     timerInterval = setInterval(() => {
@@ -388,26 +1174,48 @@
     render();
   }
 
+  function pauseTimer() {
+    if (paused || phase !== 'running' || alarmSounding) return;
+    paused = true;
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (alarmTimeout) { clearTimeout(alarmTimeout); alarmTimeout = null; }
+    render();
+  }
+  function resumeTimer() {
+    if (!paused) return;
+    paused = false;
+    timerInterval = setInterval(() => { elapsed++; render(); }, 1000);
+    scheduleNextAlarm();
+    render();
+  }
+  function togglePause() {
+    if (paused) resumeTimer(); else pauseTimer();
+  }
+
   function scheduleNextAlarm() {
     if (alarmTimeout) clearTimeout(alarmTimeout);
-
-    const remaining = totalSeconds - elapsed;
-    const nextAlarmIn = remaining > 0
-      ? remaining
-      : totalSeconds - ((elapsed - totalSeconds) % totalSeconds);
-
-    alarmTimeout = setTimeout(() => {
-      triggerAlarm();
-    }, nextAlarmIn * 1000);
+    let nextAt;
+    if (elapsed < totalSeconds) {
+      nextAt = totalSeconds; // first alarm fires when countdown reaches zero
+    } else {
+      nextAt = lastAlarmAtElapsed + snoozeActive;
+    }
+    const delaySec = Math.max(0, nextAt - elapsed);
+    alarmTimeout = setTimeout(triggerAlarm, delaySec * 1000);
   }
 
   function triggerAlarm() {
+    lastAlarmAtElapsed = elapsed;
+    // Disable the dashoffset transition for this render so the ring
+    // jump-cuts back to "full" instead of animating up from drained.
+    progressFill.style.transition = 'none';
     startAlarmSound();
     render();
-    // Schedule next alarm at next interval
-    alarmTimeout = setTimeout(() => {
-      triggerAlarm();
-    }, totalSeconds * 1000);
+    // Force a synchronous reflow so the no-transition value is committed,
+    // then restore the transition for the normal per-second drain animation.
+    void progressFill.offsetWidth;
+    progressFill.style.transition = '';
+    scheduleNextAlarm();
   }
 
   function dismissAlarm() {
@@ -421,69 +1229,393 @@
     stopAlarmSound();
     releaseWakeLock();
     phase = 'setup';
+    paused = false;
+    // Reset pending interval to whatever the user has configured for next session.
+    snoozePending = getInitialSnooze();
+    snoozeActive = snoozePending;
+    // Refresh the setup display from settings (picks up "use last used" if enabled).
+    setupSeconds = getInitialTimerSeconds();
     render();
   }
 
-  // --- Scroll wheel input ---
-  let touchStartY = null;
-  let touchAccum = 0;
-
-  function adjustMinutes(delta) {
-    minutes = Math.max(1, Math.min(90, minutes + delta));
+  // --- Snooze interval changes ---
+  function setSnoozePending(seconds, opts) {
+    opts = opts || {};
+    let v = Math.max(0, Math.min(MAX_SECONDS, seconds));
+    // Allow temporary 0 only while user is mid-typing; otherwise clamp to MIN_OT.
+    if (!opts.allowSubMin) v = Math.max(MIN_SNOOZE_SECONDS, v);
+    snoozePending = v;
+    const beforeOT = phase === 'setup' || (phase === 'running' && elapsed < totalSeconds);
+    if (beforeOT && !opts.allowSubMin) {
+      // No "pending" concept before snooze — commit immediately.
+      snoozeActive = snoozePending;
+      settings.lastUsedSnooze = snoozeActive;
+      saveSettings();
+    }
     render();
   }
 
-  scrollArea.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -1 : 1;
-    adjustMinutes(delta);
-  }, { passive: false });
+  function applySnooze() {
+    if (snoozePending < MIN_SNOOZE_SECONDS) {
+      snoozePending = MIN_SNOOZE_SECONDS;
+    }
+    if (snoozePending === snoozeActive) { render(); return; }
+    snoozeActive = snoozePending;
+    settings.lastUsedSnooze = snoozeActive;
+    saveSettings();
+    // Restart the countdown to next alarm from "now".
+    lastAlarmAtElapsed = elapsed;
+    scheduleNextAlarm();
+    render();
+  }
 
-  scrollArea.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-    touchAccum = 0;
-  }, { passive: true });
+  function cancelSnooze() {
+    // Discard the pending change; revert to the active interval.
+    snoozePending = snoozeActive;
+    render();
+  }
 
-  scrollArea.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    const y = e.touches[0].clientY;
-    const diff = touchStartY - y;
-    touchAccum += diff;
-    touchStartY = y;
-    const step = 20; // pixels per minute
-    while (touchAccum >= step) { adjustMinutes(1); touchAccum -= step; }
-    while (touchAccum <= -step) { adjustMinutes(-1); touchAccum += step; }
-  }, { passive: false });
+  function adjustSetup(deltaSeconds) {
+    setupSeconds = Math.max(1, Math.min(MAX_SECONDS, setupSeconds + deltaSeconds));
+    render();
+  }
 
-  // Mouse drag on scroll area
-  let mouseDown = false;
-  let mouseStartY = 0;
-  let mouseAccum = 0;
+  function setSegment(unit, value) {
+    const p = getParts(setupSeconds);
+    p[unit] = value;
+    const total = p.hr * 3600 + p.min * 60 + p.sec;
+    setupSeconds = Math.max(0, Math.min(MAX_SECONDS, total));
+    // Don't render yet during typing — let caller decide, so we don't fight focus.
+  }
 
-  scrollArea.addEventListener('mousedown', (e) => {
-    mouseDown = true;
-    mouseStartY = e.clientY;
-    mouseAccum = 0;
-    e.preventDefault();
+  function attachSegmentEditing(el, unit) {
+    // Note: pointer-down focus is handled by the unified clock-container drag/tap
+    // handler so a press-and-drag becomes a drag (not a focus). Tapping (no
+    // movement) calls el.focus() on release.
+    el.addEventListener('focus', () => {
+      if (phase !== 'setup') { el.blur(); return; }
+      editBuffer = '';
+    });
+    el.addEventListener('blur', () => {
+      editBuffer = '';
+      // Re-render to ensure displayed value matches state (e.g. minimum-1-second).
+      if (setupSeconds < 1) setupSeconds = 1;
+      render();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (phase !== 'setup') return;
+      const key = e.key;
+      if (key >= '0' && key <= '9') {
+        e.preventDefault();
+        editBuffer += key;
+        if (editBuffer.length > 2) editBuffer = editBuffer.slice(-2);
+        let val = parseInt(editBuffer, 10);
+        const cap = unit === 'hr' ? 99 : 59;
+        if (val > cap) val = cap;
+        setSegment(unit, val);
+        renderSegments();
+        if (editBuffer.length === 2) {
+          // Auto-advance to next segment
+          const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+          if (next) {
+            editBuffer = '';
+            next.focus();
+          }
+        }
+      } else if (key === 'ArrowUp') {
+        e.preventDefault();
+        const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
+        adjustSetup(step);
+        editBuffer = '';
+      } else if (key === 'ArrowDown') {
+        e.preventDefault();
+        const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
+        adjustSetup(-step);
+        editBuffer = '';
+      } else if (key === 'ArrowRight') {
+        e.preventDefault();
+        const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+        if (next) next.focus();
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        const prev = unit === 'sec' ? segMin : unit === 'min' ? segHr : null;
+        if (prev) prev.focus();
+      } else if (key === 'Tab') {
+        editBuffer = '';
+        // let default tab behavior continue
+      } else if (key === 'Enter') {
+        e.preventDefault();
+        el.blur();
+      } else if (key === 'Backspace' || key === 'Delete') {
+        e.preventDefault();
+        editBuffer = '';
+        setSegment(unit, 0);
+        renderSegments();
+      }
+    });
+  }
+  attachSegmentEditing(segHr, 'hr');
+  attachSegmentEditing(segMin, 'min');
+  attachSegmentEditing(segSec, 'sec');
+
+  // --- Snooze interval segment editing ---
+  // Editable in any phase. In setup/countdown, changes commit immediately;
+  // in snooze they go into pending and need Apply.
+  function attachSnoozeEditing(el, unit) {
+    el.addEventListener('focus', () => { snoozeEditBuffer = ''; });
+    el.addEventListener('blur', () => {
+      snoozeEditBuffer = '';
+      // Clamp pending to MIN_SNOOZE_SECONDS on commit
+      if (snoozePending < MIN_SNOOZE_SECONDS) {
+        snoozePending = MIN_SNOOZE_SECONDS;
+      }
+      const beforeOT = phase === 'setup' || (phase === 'running' && elapsed < totalSeconds);
+      if (beforeOT) {
+        snoozeActive = snoozePending;
+        settings.lastUsedSnooze = snoozeActive;
+        saveSettings();
+      }
+      render();
+    });
+    el.addEventListener('keydown', (e) => {
+      const key = e.key;
+      if (key >= '0' && key <= '9') {
+        e.preventDefault();
+        snoozeEditBuffer += key;
+        if (snoozeEditBuffer.length > 2) snoozeEditBuffer = snoozeEditBuffer.slice(-2);
+        let val = parseInt(snoozeEditBuffer, 10);
+        const cap = unit === 'hr' ? 99 : 59;
+        if (val > cap) val = cap;
+        const p = getParts(snoozePending);
+        p[unit] = val;
+        const total = p.hr * 3600 + p.min * 60 + p.sec;
+        // Allow temporarily-low values mid-typing; blur will clamp to MIN.
+        setSnoozePending(total, { allowSubMin: true });
+        if (snoozeEditBuffer.length === 2) {
+          const next = unit === 'hr' ? snoozeMin : unit === 'min' ? snoozeSec : null;
+          if (next) { snoozeEditBuffer = ''; next.focus(); }
+        }
+      } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+        e.preventDefault();
+        const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
+        const delta = key === 'ArrowUp' ? step : -step;
+        setSnoozePending(snoozePending + delta);
+        snoozeEditBuffer = '';
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        const prev = unit === 'sec' ? snoozeMin : unit === 'min' ? snoozeHr : null;
+        if (prev) prev.focus();
+      } else if (key === 'ArrowRight') {
+        e.preventDefault();
+        const next = unit === 'hr' ? snoozeMin : unit === 'min' ? snoozeSec : null;
+        if (next) next.focus();
+      } else if (key === 'Tab') {
+        snoozeEditBuffer = '';
+      } else if (key === 'Enter') {
+        e.preventDefault();
+        el.blur();
+      } else if (key === 'Backspace' || key === 'Delete') {
+        e.preventDefault();
+        snoozeEditBuffer = '';
+        const p = getParts(snoozePending);
+        p[unit] = 0;
+        setSnoozePending(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+      }
+    });
+  }
+  attachSnoozeEditing(snoozeHr, 'hr');
+  attachSnoozeEditing(snoozeMin, 'min');
+  attachSnoozeEditing(snoozeSec, 'sec');
+
+  // --- Reusable pointer-input binding ---
+  // Tap on a focusable target → focus it for typing. Drag (>=5px) or scroll wheel → adjust value.
+  // Each call captures its own state via closure, so multiple controls coexist.
+  const DRAG_THRESHOLD = 5;
+  const PIXELS_PER_SECOND = 5;
+  function bindDragInput(targetEl, opts) {
+    const isEnabled = opts.isEnabled || (() => true);
+    const onAdjust = opts.onAdjust;
+    const getStep = opts.getStep || (() => 1);
+    const isFocusableTap = opts.isFocusableTap || (() => false);
+    let startY = null, accum = 0, dragged = false, downTarget = null, step = 1;
+    function down(y, t) {
+      if (!isEnabled()) return;
+      startY = y; accum = 0; dragged = false; downTarget = t;
+      step = getStep(t); // lock the step to whatever segment the press started on
+    }
+    function move(y) {
+      if (startY === null) return;
+      const diff = startY - y;
+      if (!dragged && Math.abs(diff) >= DRAG_THRESHOLD) {
+        dragged = true;
+        const ae = document.activeElement;
+        if (ae && ae.classList && (ae.classList.contains('time-segment') || ae.classList.contains('snooze-segment'))) {
+          ae.blur();
+        }
+      }
+      if (dragged) {
+        accum += diff;
+        startY = y;
+        while (accum >= PIXELS_PER_SECOND) { onAdjust(step); accum -= PIXELS_PER_SECOND; }
+        while (accum <= -PIXELS_PER_SECOND) { onAdjust(-step); accum += PIXELS_PER_SECOND; }
+      }
+    }
+    function up() {
+      if (!dragged && downTarget && isFocusableTap(downTarget)) downTarget.focus();
+      startY = null; dragged = false; downTarget = null;
+    }
+    targetEl.addEventListener('mousedown', (e) => {
+      if (!isEnabled()) return;
+      e.preventDefault();
+      down(e.clientY, e.target);
+    });
+    window.addEventListener('mousemove', (e) => { if (startY !== null) move(e.clientY); });
+    window.addEventListener('mouseup', up);
+    targetEl.addEventListener('touchstart', (e) => {
+      if (!isEnabled()) return;
+      down(e.touches[0].clientY, e.target);
+    }, { passive: true });
+    targetEl.addEventListener('touchmove', (e) => {
+      if (startY === null) return;
+      e.preventDefault();
+      move(e.touches[0].clientY);
+    }, { passive: false });
+    targetEl.addEventListener('touchend', up);
+    targetEl.addEventListener('touchcancel', up);
+    targetEl.addEventListener('wheel', (e) => {
+      if (!isEnabled()) return;
+      e.preventDefault();
+      const wheelStep = getStep(e.target);
+      onAdjust(e.deltaY > 0 ? -wheelStep : wheelStep);
+    }, { passive: false });
+  }
+
+  function stepForUnit(unit) {
+    return unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
+  }
+
+  // Main clock face: only adjustable in setup. Drag on hr/min/sec changes that unit.
+  const clockContainer = document.querySelector('.clock-container');
+  bindDragInput(clockContainer, {
+    isEnabled: () => phase === 'setup',
+    onAdjust: adjustSetup,
+    getStep: (t) => (t && t.dataset && t.dataset.unit) ? stepForUnit(t.dataset.unit) : 1,
+    isFocusableTap: (t) => t && t.classList && t.classList.contains('time-segment')
   });
 
-  window.addEventListener('mousemove', (e) => {
-    if (!mouseDown) return;
-    const diff = mouseStartY - e.clientY;
-    mouseAccum += diff;
-    mouseStartY = e.clientY;
-    const step = 20;
-    while (mouseAccum >= step) { adjustMinutes(1); mouseAccum -= step; }
-    while (mouseAccum <= -step) { adjustMinutes(-1); mouseAccum += step; }
+  // Snooze interval display: adjustable in any phase. Drag on hr/min/sec changes that unit.
+  const snoozeDisplay = document.querySelector('#snooze-section .snooze-display');
+  bindDragInput(snoozeDisplay, {
+    isEnabled: () => true,
+    onAdjust: (d) => setSnoozePending(snoozePending + d),
+    getStep: (t) => (t && t.dataset && t.dataset.snu) ? stepForUnit(t.dataset.snu) : 1,
+    isFocusableTap: (t) => t && t.classList && t.classList.contains('snooze-segment')
   });
 
-  window.addEventListener('mouseup', () => { mouseDown = false; });
+  // --- Settings modal ---
+  function ensurePickersBuilt() {
+    if (pickersBuilt) return;
+    pickerDefaultTimer = buildHmsPicker(setDefTmrMount, { min: 1, initial: settings.defaultTimer });
+    pickerDefaultSnooze = buildHmsPicker(setDefSnoozeMount, { min: MIN_SNOOZE_SECONDS, initial: settings.defaultSnooze });
+    chipConfigList.innerHTML = '';
+    chipPickers = [];
+    settings.chips.forEach((secs, idx) => {
+      const row = document.createElement('div');
+      row.className = 'chip-config-row';
+      const num = document.createElement('span');
+      num.className = 'chip-num';
+      num.textContent = (idx + 1) + '.';
+      const mount = document.createElement('div');
+      mount.className = 'hms-input';
+      row.append(num, mount);
+      chipConfigList.appendChild(row);
+      // First chip enforces MIN_SNOOZE_SECONDS; the rest just need to be non-decreasing
+      // (validated on save), so allow >=0 here.
+      const picker = buildHmsPicker(mount, { min: idx === 0 ? MIN_SNOOZE_SECONDS : 0, initial: secs });
+      chipPickers.push(picker);
+    });
+    pickersBuilt = true;
+  }
+
+  function openSettings() {
+    ensurePickersBuilt();
+    pickerDefaultTimer.setValue(settings.defaultTimer);
+    pickerDefaultSnooze.setValue(settings.defaultSnooze);
+    setUseLastTmr.checked = !!settings.useLastUsedTimer;
+    setUseLastSnooze.checked = !!settings.useLastUsedSnooze;
+    chipPickers.forEach((p, idx) => p.setValue(settings.chips[idx]));
+    chipsError.classList.add('hidden');
+    defaultError.classList.add('hidden');
+    defaultTmrError.classList.add('hidden');
+    settingsModal.classList.remove('hidden');
+  }
+  function closeSettings() { settingsModal.classList.add('hidden'); }
+
+  function validateAndSaveSettings() {
+    const defTmr = pickerDefaultTimer.getValue();
+    if (defTmr < 1) {
+      defaultTmrError.textContent = 'Default timer must be at least 1 second.';
+      defaultTmrError.classList.remove('hidden');
+      return;
+    }
+    defaultTmrError.classList.add('hidden');
+
+    const def = pickerDefaultSnooze.getValue();
+    if (def < MIN_SNOOZE_SECONDS) {
+      defaultError.textContent = 'Default must be at least ' + MIN_SNOOZE_SECONDS + ' seconds.';
+      defaultError.classList.remove('hidden');
+      return;
+    }
+    defaultError.classList.add('hidden');
+
+    const chips = chipPickers.map(p => p.getValue());
+    if (chips[0] < MIN_SNOOZE_SECONDS) {
+      chipsError.textContent = 'Chip 1 must be at least ' + MIN_SNOOZE_SECONDS + ' seconds.';
+      chipsError.classList.remove('hidden');
+      return;
+    }
+    for (let i = 1; i < chips.length; i++) {
+      if (chips[i] < chips[i - 1]) {
+        chipsError.textContent = 'Chip ' + (i + 1) + ' (' + chipLabel(chips[i]) + ') must be \u2265 chip ' + i + ' (' + chipLabel(chips[i - 1]) + ').';
+        chipsError.classList.remove('hidden');
+        return;
+      }
+    }
+    chipsError.classList.add('hidden');
+
+    settings.defaultTimer = defTmr;
+    settings.useLastUsedTimer = setUseLastTmr.checked;
+    settings.defaultSnooze = def;
+    settings.useLastUsedSnooze = setUseLastSnooze.checked;
+    settings.chips = chips;
+    saveSettings();
+    closeSettings();
+
+    // In setup phase, refresh displayed values to reflect new defaults.
+    if (phase === 'setup') {
+      setupSeconds = getInitialTimerSeconds();
+      snoozePending = getInitialSnooze();
+      snoozeActive = snoozePending;
+    }
+    render();
+  }
 
   // --- Button handlers ---
   document.getElementById('btn-start').addEventListener('click', startTimer);
   document.getElementById('btn-stop').addEventListener('click', stopTimer);
+  document.getElementById('btn-pause').addEventListener('click', togglePause);
+  btnResetInner.addEventListener('click', stopTimer);
   document.getElementById('btn-dismiss').addEventListener('click', dismissAlarm);
   document.getElementById('btn-stop-alarm').addEventListener('click', stopTimer);
+  document.getElementById('btn-apply').addEventListener('click', applySnooze);
+  document.getElementById('btn-cancel-apply').addEventListener('click', cancelSnooze);
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-settings-cancel').addEventListener('click', closeSettings);
+  document.getElementById('btn-settings-save').addEventListener('click', validateAndSaveSettings);
+  // Click-outside-modal-card closes the modal
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeSettings();
+  });
 
   // --- Init ---
   render();
