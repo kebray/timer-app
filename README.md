@@ -67,6 +67,12 @@ Manual deploy:
 node scripts/build.js && netlify deploy --prod --dir=dist
 ```
 
+To push and tail the Netlify deploy until it finishes:
+
+```bash
+./scripts/deploy.sh
+```
+
 ## Versioning
 
 - `version.txt` holds the manual semver (bump for meaningful releases).

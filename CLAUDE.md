@@ -108,6 +108,7 @@ Gear icon in the top-right corner opens a modal containing:
 - **Build command**: `node scripts/build.js`. **Publish dir**: `dist/`. Configured via `netlify.toml`.
 - **Auto-deploy on push**: live. The Netlify GitHub App is installed with access to all repos under `kebray`, and the repo is linked under `Continuous deployment`. Each push to `main` triggers a build that runs `node scripts/build.js` and publishes `dist/`.
 - Manual fallback: `node scripts/build.js && netlify deploy --prod --dir=dist`
+- **`scripts/deploy.sh`** — convenience wrapper: `git push` then `netlify watch` to tail the deploy progress until it finishes. Use it instead of bare `git push` when you want to know the moment the deploy is live.
 
 ## UI shell (Tabs)
 
@@ -190,6 +191,7 @@ timer-app/
 
   scripts/
     build.js              # Node build script (zero deps)
+    deploy.sh             # `git push` + `netlify watch` convenience wrapper
 
   public/                 # Static assets copied verbatim to dist/ (sw.js gets a build-id substitution)
     manifest.webmanifest  # PWA manifest

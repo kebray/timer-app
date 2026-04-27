@@ -5,6 +5,8 @@ All notable changes to App Timer are recorded here. Newest at the top.
 ## v0.1.0 — 2026-04-26
 
 ### Added
+- **Reset to Defaults** button at the bottom of Settings — wipes saved settings (default timer, default snooze, chip values, last-used toggles) and re-applies the built-in defaults.
+- Settings → **Save** now returns you to the Timer tab automatically.
 - **Progressive Web App support** — installable from browser ("Add to Home Screen" on mobile, install prompt on desktop Chrome/Edge). Includes a web app manifest, an SVG app icon, and a minimal service worker for offline use of the cached app shell. Each deploy gets a fresh cache via build-id-based cache versioning.
 - Three-tab UI (Timer / Settings / About) with bottom footer.
 - About screen showing app version and a scrollable changelog viewer.

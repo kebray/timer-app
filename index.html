@@ -633,6 +633,21 @@
   }
   .modal-actions .btn { padding: 0.5rem 1.2rem; font-size: 0.9rem; }
 
+  .settings-reset-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+  }
+  .btn.settings-reset {
+    border-color: rgba(232, 84, 84, 0.45);
+    color: rgba(232, 84, 84, 0.9);
+    font-size: 0.85rem;
+    padding: 0.5rem 1rem;
+  }
+  .btn.settings-reset:hover { border-color: var(--red); color: var(--red); }
+  .btn.settings-reset:active { background: var(--red); color: var(--bg); }
+
   /* --- Mobile: bump font sizes a notch since there's room. --- */
   @media (max-width: 480px) {
     #phase-label { font-size: 1.25rem; margin-bottom: 1.4rem; }
@@ -775,6 +790,10 @@
 
       <div class="modal-actions">
         <button class="btn primary" id="btn-settings-save">Save</button>
+      </div>
+
+      <div class="settings-reset-section">
+        <button class="btn settings-reset" id="btn-settings-reset">Reset to Defaults</button>
       </div>
     </div>
   </section>
@@ -2008,6 +2027,24 @@
       snoozeActive = snoozePending;
     }
     render();
+    // After a successful Save, drop back to the Timer tab.
+    switchScreen('timer');
+  }
+
+  function resetSettingsToDefaults() {
+    if (!confirm('Reset all settings to defaults? This will replace your saved default timer, snooze interval, and chip values.')) {
+      return;
+    }
+    settings = Object.assign({}, DEFAULT_SETTINGS, { chips: DEFAULT_SETTINGS.chips.slice() });
+    saveSettings();
+    loadSettingsForm();
+    if (phase === 'setup') {
+      setupSeconds = getInitialTimerSeconds();
+      snoozePending = getInitialSnooze();
+      snoozeActive = snoozePending;
+    }
+    render();
+    switchScreen('timer');
   }
 
   // --- Button handlers ---
@@ -2020,6 +2057,7 @@
   document.getElementById('btn-apply').addEventListener('click', applySnooze);
   document.getElementById('btn-cancel-apply').addEventListener('click', cancelSnooze);
   document.getElementById('btn-settings-save').addEventListener('click', validateAndSaveSettings);
+  document.getElementById('btn-settings-reset').addEventListener('click', resetSettingsToDefaults);
 
   // --- Tab switching (Timer / Settings / About) ---
   function switchScreen(name) {
