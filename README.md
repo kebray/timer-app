@@ -25,9 +25,9 @@ Most timer apps stop when they hit zero. App Timer is built for the case where y
 
 ## Tech
 
-- **Single `index.html` file** — all HTML, CSS, JavaScript inline.
-- **No build step. No dependencies. No bundler.** Vanilla JS, modern browser APIs.
-- Web Audio API for the chime, Wake Lock API to keep the screen on, `localStorage` for persistence.
+- **Single `index.html` source file** — all HTML, CSS, JavaScript inline. Vanilla JS, no frameworks, no bundler.
+- **Tiny Node build step** (`scripts/build.js`, zero npm deps) injects a version string and the `CHANGELOG.md` text into a copy of `index.html` and copies static assets from `public/` to `dist/` before publishing.
+- Web Audio API for the chime, Wake Lock API to keep the screen on, `localStorage` for persistence and live-state save-on-refresh.
 - Runs in any modern browser — Chrome, Firefox, Safari, Edge — desktop and mobile.
 
 ## Run locally
@@ -38,19 +38,44 @@ cd timer-app
 open index.html         # or: python3 -m http.server 8000 && open http://localhost:8000
 ```
 
-That's it. There's nothing to install.
+There's nothing to install. The version label will read `v0.0.0 (dev)` and the changelog modal shows a placeholder until you run a build.
 
-## Install as an app
+To preview the production build locally:
 
-Because it's a static page, you can "Add to Home Screen" on iOS and Android, or "Install" in Chrome / Edge desktop, and it'll behave like a standalone app.
+```bash
+node scripts/build.js
+open dist/index.html
+```
+
+## Install as an app (PWA)
+
+App Timer is a Progressive Web App — it ships with a manifest, an icon, and a service worker, so it's first-class installable:
+
+- **Android Chrome:** menu → "Install app" (or you'll see an install prompt automatically).
+- **iOS Safari:** Share → "Add to Home Screen".
+- **Desktop Chrome / Edge:** click the install icon in the address bar.
+
+Installed instances run in standalone mode (no browser chrome) and work offline once the app shell has been cached. Each deploy invalidates the old cache so you'll always pick up the latest version on the next launch.
 
 ## Deployment
 
-Hosted on [Netlify](https://www.netlify.com/) — static publish, no build command. To deploy a fresh copy:
+Hosted on [Netlify](https://www.netlify.com/) with auto-deploy on push to `main`. Netlify runs `node build.js` and publishes `dist/`. Configured via [`netlify.toml`](netlify.toml).
+
+Manual deploy:
 
 ```bash
-netlify deploy --prod --dir=.
+node scripts/build.js && netlify deploy --prod --dir=dist
 ```
+
+## Versioning
+
+- `version.txt` holds the manual semver (bump for meaningful releases).
+- The build number is derived from the git commit count (`git rev-list --count HEAD`), so every push produces a new version label without manual intervention.
+- The full label looks like **`v0.1.0 (build 47)`** and is shown on the About tab.
+
+## Changelog
+
+User-visible changes are recorded in [`CHANGELOG.md`](CHANGELOG.md), embedded into the app at build time and viewable in-app from About → "View Changelog".
 
 ## Roadmap
 

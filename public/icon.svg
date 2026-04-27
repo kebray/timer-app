@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="App Timer">
+  <rect width="512" height="512" fill="#1a1a2e"/>
+  <circle cx="256" cy="262" r="172" fill="none" stroke="#e8b84b" stroke-width="22"/>
+  <path d="M236 90h40" stroke="#e8b84b" stroke-width="20" stroke-linecap="round"/>
+  <path d="M256 162v100l60 36" stroke="#e8b84b" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

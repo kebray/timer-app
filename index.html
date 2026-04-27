@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>App Timer</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="App Timer">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,13 +31,153 @@
     color: var(--text);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
     min-height: 100dvh;
     overflow: hidden;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  /* --- Screens (Timer / Settings / About) --- */
+  #screens {
+    flex: 1;
+    display: flex;
+    position: relative;
+    min-height: 0;
+  }
+  .screen {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    overflow-y: auto;
+  }
+  .screen.active { display: flex; }
+
+  /* Timer + About center their content. Settings is top-anchored + scrollable. */
+  #screen-timer, #screen-about {
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1rem 5rem;
+  }
+  #screen-settings {
+    padding: 1.5rem 1rem 5rem;
+  }
+  #screen-settings .screen-content {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  .screen-title {
+    color: var(--gold);
+    font-size: 1.4rem;
+    font-weight: 300;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* --- Bottom tab footer --- */
+  #footer-tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    display: flex;
+    background: rgba(15, 15, 30, 0.92);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 50;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.4rem;
+    font-family: inherit;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab-btn.active { color: var(--gold); }
+  .tab-btn svg { display: block; width: 22px; height: 22px; }
+
+  /* --- About screen content --- */
+  .about-content {
+    text-align: center;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .about-icon-wrap {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 28px rgba(232, 184, 75, 0.2), inset 0 0 18px rgba(232, 184, 75, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+  }
+  .about-name {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+  }
+  .about-tagline {
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .about-version {
+    color: var(--dim);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+  .about-link {
+    margin-top: 1rem;
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border-bottom: 1px dotted var(--dim);
+    padding-bottom: 1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .about-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* --- Changelog modal body --- */
+  .changelog-body {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    padding: 0.9rem 1rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0.5rem 0;
   }
 
   /* --- Phase label --- */
@@ -107,15 +256,24 @@
     font-size: 2.4rem;
     font-weight: 300;
     font-variant-numeric: tabular-nums;
+    font-family: inherit;
     padding: 0.05em 0.2em;
+    border: none;
     border-radius: 0.15em;
+    background: transparent;
     color: var(--text);
     cursor: text;
     outline: none;
     transition: background 0.15s, color 0.15s;
-    min-width: 1.6em;
+    width: 1.95em;
     text-align: center;
+    -webkit-appearance: none;
+    appearance: none;
   }
+  .time-segment::-webkit-outer-spin-button,
+  .time-segment::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  /* Allow tap to trigger native focus + soft keyboard despite body's touch-action:none */
+  .time-segment, .snooze-segment, .hms-seg { touch-action: manipulation; }
   .time-segment:hover { background: rgba(232, 184, 75, 0.1); }
   .time-segment:focus,
   .time-segment.editing {
@@ -238,30 +396,31 @@
     transition: stroke-dashoffset 0.5s linear, stroke 0.4s;
   }
 
-  /* --- Gear (settings) button --- */
-  .gear-btn {
+  /* --- Pull-to-refresh indicator --- */
+  #prt-indicator {
     position: fixed;
-    top: 1rem;
-    right: 1rem;
+    top: -50px;
+    left: 50%;
+    transform: translate(-50%, 0);
     width: 40px;
     height: 40px;
-    border: 1px solid rgba(232, 184, 75, 0.4);
-    background: transparent;
-    color: var(--gold);
     border-radius: 50%;
-    font-size: 1.2rem;
-    cursor: pointer;
+    background: rgba(232, 184, 75, 0.18);
+    color: var(--gold);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 50;
-    transition: background 0.2s, border-color 0.2s;
-    -webkit-tap-highlight-color: transparent;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease;
   }
-  .gear-btn:hover { background: rgba(232, 184, 75, 0.1); border-color: var(--gold); }
-  .gear-btn:active { background: var(--gold); color: var(--bg); }
+  #prt-indicator.ready {
+    background: var(--gold);
+    color: var(--bg);
+  }
 
-  /* --- Original timer value (running phase) --- */
+/* --- Original timer value (running phase) --- */
   .timer-original {
     margin-top: -0.8rem;
     margin-bottom: 1.2rem;
@@ -316,15 +475,23 @@
   .snooze-segment {
     font-size: 1.4rem;
     font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    font-family: inherit;
     padding: 0.05em 0.25em;
+    border: none;
     border-radius: 0.15em;
+    background: transparent;
     color: var(--text);
     cursor: text;
     outline: none;
-    min-width: 1.5em;
+    width: 1.9em;
     text-align: center;
     transition: background 0.15s, color 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
   }
+  .snooze-segment::-webkit-outer-spin-button,
+  .snooze-segment::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .snooze-segment:hover { background: rgba(232, 184, 75, 0.1); }
   .snooze-segment:focus { background: var(--gold); color: var(--bg); }
   .snooze-colon {
@@ -419,15 +586,18 @@
     border-radius: 0.25rem;
     color: var(--text);
     font-size: 1rem;
+    font-family: inherit;
     text-align: center;
     font-variant-numeric: tabular-nums;
     cursor: text;
     outline: none;
-    user-select: none;
-    -webkit-user-select: none;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
   }
+  .hms-seg::-webkit-outer-spin-button,
+  .hms-seg::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .hms-seg:hover { border-color: rgba(232, 184, 75, 0.5); }
   .hms-seg:focus { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .hms-colon { color: var(--dim); padding: 0 0.05rem; }
@@ -483,118 +653,186 @@
 </head>
 <body>
 
-<button class="gear-btn" id="btn-settings" aria-label="Settings" title="Settings">&#9881;</button>
-
-<div id="phase-label">set your timer</div>
-<div class="timer-original hidden" id="timer-original">Timer: <span class="v" id="timer-original-val">00:00</span></div>
-
-<div class="clock-container">
-  <div class="glow-ring" id="glow-ring"></div>
-  <svg class="progress-ring" id="progress-ring" viewBox="0 0 292 292">
-    <circle class="track" cx="146" cy="146" r="140"/>
-    <circle class="fill" id="progress-fill" cx="146" cy="146" r="140"/>
+<div id="prt-indicator" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 1 0 3-6.7"/>
+    <path d="M3 4v5h5"/>
   </svg>
-  <div id="setup-display">
-    <div class="seg-group">
-      <div class="seg-label">hr</div>
-      <span class="time-segment" id="seg-hr" tabindex="0" data-unit="hr" inputmode="numeric">00</span>
+</div>
+
+<main id="screens">
+
+  <!-- ============ TIMER SCREEN ============ -->
+  <section class="screen active" id="screen-timer">
+    <div id="phase-label">set your timer</div>
+    <div class="timer-original hidden" id="timer-original">Timer: <span class="v" id="timer-original-val">00:00</span></div>
+
+    <div class="clock-container">
+      <div class="glow-ring" id="glow-ring"></div>
+      <svg class="progress-ring" id="progress-ring" viewBox="0 0 292 292">
+        <circle class="track" cx="146" cy="146" r="140"/>
+        <circle class="fill" id="progress-fill" cx="146" cy="146" r="140"/>
+      </svg>
+      <div id="setup-display">
+        <div class="seg-group">
+          <div class="seg-label">hr</div>
+          <input class="time-segment" id="seg-hr" data-unit="hr" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="hours" autocomplete="off">
+        </div>
+        <span class="seg-colon">:</span>
+        <div class="seg-group">
+          <div class="seg-label">min</div>
+          <input class="time-segment" id="seg-min" data-unit="min" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="05" aria-label="minutes" autocomplete="off">
+        </div>
+        <span class="seg-colon">:</span>
+        <div class="seg-group">
+          <div class="seg-label">sec</div>
+          <input class="time-segment" id="seg-sec" data-unit="sec" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="seconds" autocomplete="off">
+        </div>
+      </div>
+      <div id="clock-display" class="hidden">05:00</div>
+      <button class="center-btn hidden" id="btn-reset-inner" aria-label="Reset timer" title="Reset">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7"/>
+          <path d="M3 4v5h5"/>
+        </svg>
+      </button>
+      <div id="scroll-area"></div>
     </div>
-    <span class="seg-colon">:</span>
-    <div class="seg-group">
-      <div class="seg-label">min</div>
-      <span class="time-segment" id="seg-min" tabindex="0" data-unit="min" inputmode="numeric">05</span>
+
+    <div class="adjust-hint" id="adjust-hint">tap to type · scroll or drag any segment to adjust</div>
+
+    <div class="total-line hidden" id="total-time-line">Total Time: <span class="v" id="total-time-val">00:00</span></div>
+    <div class="total-line hidden" id="total-snooze-line">Total Snooze: <span class="v" id="total-snooze-val">00:00</span></div>
+
+    <div class="btn-row" id="setup-btns">
+      <button class="btn primary" id="btn-start">Start</button>
     </div>
-    <span class="seg-colon">:</span>
-    <div class="seg-group">
-      <div class="seg-label">sec</div>
-      <span class="time-segment" id="seg-sec" tabindex="0" data-unit="sec" inputmode="numeric">00</span>
+
+    <div class="btn-row hidden" id="running-btns">
+      <button class="btn icon-only" id="btn-pause" aria-label="Pause" title="Pause"></button>
+      <button class="btn danger icon-only" id="btn-stop" aria-label="Stop Timer" title="Stop Timer">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+      </button>
     </div>
-  </div>
-  <div id="clock-display" class="hidden">05:00</div>
-  <button class="center-btn hidden" id="btn-reset-inner" aria-label="Reset timer" title="Reset">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 1 1-3-6.7"/>
-      <path d="M21 4v5h-5"/>
+
+    <div class="btn-row hidden" id="alarm-btns">
+      <button class="btn dismiss" id="btn-dismiss">Dismiss</button>
+      <button class="btn danger icon-only" id="btn-stop-alarm" aria-label="Stop Timer" title="Stop Timer">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+      </button>
+    </div>
+
+    <div class="divider" id="snooze-divider"></div>
+
+    <div id="snooze-section">
+      <div class="snooze-label">Snooze alarm every <span id="snooze-pending-flag" class="hidden">(pending)</span></div>
+      <div class="snooze-display">
+        <input class="snooze-segment" id="snooze-hr" data-snu="hr" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="snooze hours" autocomplete="off">
+        <span class="snooze-colon">:</span>
+        <input class="snooze-segment" id="snooze-min" data-snu="min" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="05" aria-label="snooze minutes" autocomplete="off">
+        <span class="snooze-colon">:</span>
+        <input class="snooze-segment" id="snooze-sec" data-snu="sec" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="snooze seconds" autocomplete="off">
+      </div>
+      <div class="chip-row" id="chip-row"></div>
+    </div>
+
+    <div class="btn-row hidden" id="apply-btn-row">
+      <button class="btn" id="btn-cancel-apply">Cancel</button>
+      <button class="btn primary" id="btn-apply">Apply New Snooze</button>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS SCREEN ============ -->
+  <section class="screen" id="screen-settings">
+    <div class="screen-content">
+      <h1 class="screen-title">Settings</h1>
+
+      <section class="settings-section">
+        <h3>Default timer</h3>
+        <div class="hms-input" id="set-def-tmr-mount"></div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="set-use-last-tmr">
+          <span>Use last-used timer value instead</span>
+        </label>
+        <div class="settings-error hidden" id="default-tmr-error"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Default snooze interval</h3>
+        <div class="hms-input" id="set-def-snooze-mount"></div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="set-use-last-snooze">
+          <span>Use last-used snooze interval instead</span>
+        </label>
+        <div class="settings-error hidden" id="default-error"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Quick chip values (must be increasing, &ge; 5s)</h3>
+        <div id="chip-config-list"></div>
+        <div class="settings-error hidden" id="chips-error"></div>
+      </section>
+
+      <div class="modal-actions">
+        <button class="btn primary" id="btn-settings-save">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ABOUT SCREEN ============ -->
+  <section class="screen" id="screen-about">
+    <div class="about-content">
+      <div class="about-icon-wrap">
+        <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="13" r="8"/>
+          <path d="M12 9v4l2.5 2"/>
+          <path d="M9 2h6"/>
+        </svg>
+      </div>
+      <div class="about-name">App Timer</div>
+      <p class="about-tagline">A snooze timer for activity timing.</p>
+      <div class="about-version" id="about-version">v0.0.0 (dev)</div>
+      <button class="btn" id="btn-show-changelog">View Changelog</button>
+      <a class="about-link" href="https://github.com/kebray/timer-app" target="_blank" rel="noreferrer noopener">View source on GitHub</a>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ FOOTER TABS ============ -->
+<nav id="footer-tabs">
+  <button class="tab-btn active" data-tab="timer" aria-label="Timer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="13" r="8"/>
+      <path d="M12 9v4l2.5 2"/>
+      <path d="M9 2h6"/>
     </svg>
+    <span>Timer</span>
   </button>
-  <div id="scroll-area"></div>
-</div>
-
-<div class="adjust-hint" id="adjust-hint">tap to type · scroll or drag any segment to adjust</div>
-
-<div class="total-line hidden" id="total-time-line">Total Time: <span class="v" id="total-time-val">00:00</span></div>
-<div class="total-line hidden" id="total-snooze-line">Total Snooze: <span class="v" id="total-snooze-val">00:00</span></div>
-
-<div class="btn-row" id="setup-btns">
-  <button class="btn primary" id="btn-start">Start</button>
-</div>
-
-<div class="btn-row hidden" id="running-btns">
-  <button class="btn icon-only" id="btn-pause" aria-label="Pause" title="Pause"></button>
-  <button class="btn danger icon-only" id="btn-stop" aria-label="Stop Timer" title="Stop Timer">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+  <button class="tab-btn" data-tab="settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    <span>Settings</span>
   </button>
-</div>
-
-<div class="btn-row hidden" id="alarm-btns">
-  <button class="btn dismiss" id="btn-dismiss">Dismiss</button>
-  <button class="btn danger icon-only" id="btn-stop-alarm" aria-label="Stop Timer" title="Stop Timer">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+  <button class="tab-btn" data-tab="about" aria-label="About">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 16v-4"/>
+      <path d="M12 8h.01"/>
+    </svg>
+    <span>About</span>
   </button>
-</div>
+</nav>
 
-<div class="divider" id="snooze-divider"></div>
-
-<div id="snooze-section">
-  <div class="snooze-label">Snooze alarm every <span id="snooze-pending-flag" class="hidden">(pending)</span></div>
-  <div class="snooze-display">
-    <span class="snooze-segment" id="snooze-hr" tabindex="0" data-snu="hr" inputmode="numeric">00</span>
-    <span class="snooze-colon">:</span>
-    <span class="snooze-segment" id="snooze-min" tabindex="0" data-snu="min" inputmode="numeric">05</span>
-    <span class="snooze-colon">:</span>
-    <span class="snooze-segment" id="snooze-sec" tabindex="0" data-snu="sec" inputmode="numeric">00</span>
-  </div>
-  <div class="chip-row" id="chip-row"></div>
-</div>
-
-<div class="btn-row hidden" id="apply-btn-row">
-  <button class="btn" id="btn-cancel-apply">Cancel</button>
-  <button class="btn primary" id="btn-apply">Apply New Snooze</button>
-</div>
-
-<div class="modal-backdrop hidden" id="settings-modal">
+<!-- ============ CHANGELOG MODAL ============ -->
+<div class="modal-backdrop hidden" id="changelog-modal">
   <div class="modal-card">
-    <div class="modal-title">Settings</div>
-
-    <section class="settings-section">
-      <h3>Default timer</h3>
-      <div class="hms-input" id="set-def-tmr-mount"></div>
-      <label class="settings-toggle">
-        <input type="checkbox" id="set-use-last-tmr">
-        <span>Use last-used timer value instead</span>
-      </label>
-      <div class="settings-error hidden" id="default-tmr-error"></div>
-    </section>
-
-    <section class="settings-section">
-      <h3>Default snooze interval</h3>
-      <div class="hms-input" id="set-def-snooze-mount"></div>
-      <label class="settings-toggle">
-        <input type="checkbox" id="set-use-last-snooze">
-        <span>Use last-used snooze interval instead</span>
-      </label>
-      <div class="settings-error hidden" id="default-error"></div>
-    </section>
-
-    <section class="settings-section">
-      <h3>Quick chip values (must be increasing, &ge; 5s)</h3>
-      <div id="chip-config-list"></div>
-      <div class="settings-error hidden" id="chips-error"></div>
-    </section>
-
+    <div class="modal-title">Changelog</div>
+    <div class="changelog-body" id="changelog-body"></div>
     <div class="modal-actions">
-      <button class="btn" id="btn-settings-cancel">Cancel</button>
-      <button class="btn primary" id="btn-settings-save">Save</button>
+      <button class="btn primary" id="btn-changelog-close">Close</button>
     </div>
   </div>
 </div>
@@ -608,6 +846,7 @@
   const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
   const ICON_PLAY  = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><polygon points="7 4 19 12 7 20"/></svg>';
   const SETTINGS_KEY = 'app-timer-settings';
+  const STATE_KEY = 'app-timer-state';
   const DEFAULT_SETTINGS = {
     defaultTimer: 300,           // 5 min (main timer)
     useLastUsedTimer: false,
@@ -663,6 +902,38 @@
     return Math.max(1, settings.defaultTimer || 300);
   }
 
+  // --- Live timer state persistence (survives a page refresh) ---
+  function saveLiveState() {
+    if (phase !== 'running') {
+      try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+      return;
+    }
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        phase: 'running',
+        totalSeconds: totalSeconds,
+        snoozeActive: snoozeActive,
+        snoozePending: snoozePending,
+        paused: paused,
+        elapsedAtSave: elapsed,
+        lastSaveMs: Date.now(),
+        lastAlarmAtElapsed: lastAlarmAtElapsed
+      }));
+    } catch (e) {}
+  }
+  function clearLiveState() {
+    try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+  }
+  function loadLiveState() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s || s.phase !== 'running') return null;
+      return s;
+    } catch (e) { return null; }
+  }
+
   // --- State ---
   let setupSeconds = getInitialTimerSeconds();
   let totalSeconds = 0;
@@ -676,8 +947,6 @@
   let activeOscillators = [];
   let wakeLock = null;
   let alarmSounding = false;
-  let editBuffer = '';
-  let snoozeEditBuffer = '';
 
   // --- Snooze state ---
   let snoozeActive = getInitialSnooze();
@@ -718,8 +987,19 @@
   const btnPause = document.getElementById('btn-pause');
   // Inner reset button (shown only during countdown, before any alarm)
   const btnResetInner = document.getElementById('btn-reset-inner');
-  // Settings modal
-  const settingsModal = document.getElementById('settings-modal');
+  // Screens / tabs
+  const screens = {
+    timer: document.getElementById('screen-timer'),
+    settings: document.getElementById('screen-settings'),
+    about: document.getElementById('screen-about')
+  };
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  // Changelog modal
+  const changelogModal = document.getElementById('changelog-modal');
+  const changelogBody = document.getElementById('changelog-body');
+  // About screen
+  const aboutVersion = document.getElementById('about-version');
+  // Settings form mounts (now inside the Settings screen, not a modal)
   const setDefTmrMount = document.getElementById('set-def-tmr-mount');
   const setDefSnoozeMount = document.getElementById('set-def-snooze-mount');
   const setUseLastSnooze = document.getElementById('set-use-last-snooze');
@@ -780,17 +1060,21 @@
 
   function renderSegments() {
     const p = getParts(setupSeconds);
+    const ae = document.activeElement;
     [['hr', segHr], ['min', segMin], ['sec', segSec]].forEach(([unit, el]) => {
+      if (el === ae) return; // user is typing here — don't fight them
       const txt = String(p[unit]).padStart(2, '0');
-      if (el.textContent !== txt) el.textContent = txt;
+      if (el.value !== txt) el.value = txt;
     });
   }
 
   function renderSnoozeSegments() {
     const p = getParts(snoozePending);
+    const ae = document.activeElement;
     [['hr', snoozeHr], ['min', snoozeMin], ['sec', snoozeSec]].forEach(([unit, el]) => {
+      if (el === ae) return;
       const txt = String(p[unit]).padStart(2, '0');
-      if (el.textContent !== txt) el.textContent = txt;
+      if (el.value !== txt) el.value = txt;
     });
   }
 
@@ -820,11 +1104,16 @@
     container.innerHTML = '';
 
     function makeSeg(unit) {
-      const el = document.createElement('span');
+      const el = document.createElement('input');
+      el.type = 'text';
       el.className = 'hms-seg';
-      el.setAttribute('tabindex', '0');
       el.setAttribute('inputmode', 'numeric');
+      el.setAttribute('pattern', '[0-9]*');
+      el.setAttribute('maxlength', '2');
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('aria-label', unit);
       el.dataset.hmsUnit = unit;
+      el.value = '00';
       return el;
     }
     function makeColon() {
@@ -847,9 +1136,11 @@
       const tHr = String(p.hr).padStart(2, '0');
       const tMin = String(p.min).padStart(2, '0');
       const tSec = String(p.sec).padStart(2, '0');
-      if (segHr.textContent !== tHr) segHr.textContent = tHr;
-      if (segMin.textContent !== tMin) segMin.textContent = tMin;
-      if (segSec.textContent !== tSec) segSec.textContent = tSec;
+      // Don't overwrite a focused input — the user may be mid-typing.
+      const ae = document.activeElement;
+      if (ae !== segHr && segHr.value !== tHr) segHr.value = tHr;
+      if (ae !== segMin && segMin.value !== tMin) segMin.value = tMin;
+      if (ae !== segSec && segSec.value !== tSec) segSec.value = tSec;
     }
     function setVal(v, opts2) {
       opts2 = opts2 || {};
@@ -863,48 +1154,85 @@
     }
 
     function attach(el, unit) {
-      el.addEventListener('focus', () => { buffer = ''; });
+      let buffer = '';
+      let keydownHandled = false;
+
+      function applyDigit(digit) {
+        buffer += digit;
+        if (buffer.length > 2) buffer = buffer.slice(-2);
+        const v = parseInt(buffer, 10);
+        const cap = unit === 'hr' ? 99 : 59;
+        const capped = Math.min(v, cap);
+        el.value = String(capped).padStart(2, '0');
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {}
+        const p = getParts(value);
+        p[unit] = capped;
+        setVal(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+        if (buffer.length === 2) {
+          const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+          if (next) { buffer = ''; next.focus(); }
+        }
+      }
+
+      el.addEventListener('focus', () => {
+        buffer = '';
+        try { el.select(); } catch (_) {}
+      });
       el.addEventListener('blur', () => {
         buffer = '';
         if (value < minVal) { value = minVal; refresh(); }
       });
       el.addEventListener('keydown', (e) => {
+        keydownHandled = false;
         const key = e.key;
         if (key >= '0' && key <= '9') {
           e.preventDefault();
-          buffer += key;
-          if (buffer.length > 2) buffer = buffer.slice(-2);
-          let v = parseInt(buffer, 10);
-          const cap = unit === 'hr' ? 99 : 59;
-          if (v > cap) v = cap;
-          setUnit(unit, v);
-          if (buffer.length === 2) {
-            const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
-            if (next) { buffer = ''; next.focus(); }
-          }
+          applyDigit(key);
+          keydownHandled = true;
         } else if (key === 'ArrowUp' || key === 'ArrowDown') {
           e.preventDefault();
           const step = stepForUnit(unit);
           setVal(value + (key === 'ArrowUp' ? step : -step));
           buffer = '';
+          keydownHandled = true;
         } else if (key === 'ArrowLeft') {
           e.preventDefault();
           const prev = unit === 'sec' ? segMin : unit === 'min' ? segHr : null;
           if (prev) prev.focus();
+          keydownHandled = true;
         } else if (key === 'ArrowRight') {
           e.preventDefault();
           const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
           if (next) next.focus();
+          keydownHandled = true;
         } else if (key === 'Tab') {
           buffer = '';
         } else if (key === 'Enter') {
           e.preventDefault();
           el.blur();
+          keydownHandled = true;
         } else if (key === 'Backspace' || key === 'Delete') {
           e.preventDefault();
           buffer = '';
-          setUnit(unit, 0);
+          const p = getParts(value);
+          p[unit] = 0;
+          setVal(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+          el.value = '00';
+          keydownHandled = true;
         }
+      });
+      el.addEventListener('input', () => {
+        if (keydownHandled) { keydownHandled = false; return; }
+        const valDigits = (el.value || '').replace(/\D/g, '');
+        if (valDigits.length === 0) {
+          buffer = '';
+          const p = getParts(value);
+          p[unit] = 0;
+          setVal(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+          el.value = '00';
+          return;
+        }
+        applyDigit(valDigits.charAt(valDigits.length - 1));
       });
     }
     attach(segHr, 'hr');
@@ -1171,6 +1499,7 @@
       render();
     }, 1000);
 
+    saveLiveState();
     render();
   }
 
@@ -1179,6 +1508,7 @@
     paused = true;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     if (alarmTimeout) { clearTimeout(alarmTimeout); alarmTimeout = null; }
+    saveLiveState();
     render();
   }
   function resumeTimer() {
@@ -1186,6 +1516,7 @@
     paused = false;
     timerInterval = setInterval(() => { elapsed++; render(); }, 1000);
     scheduleNextAlarm();
+    saveLiveState();
     render();
   }
   function togglePause() {
@@ -1199,6 +1530,13 @@
       nextAt = totalSeconds; // first alarm fires when countdown reaches zero
     } else {
       nextAt = lastAlarmAtElapsed + snoozeActive;
+      // Catch-up: if many cycles passed during a refresh delay, skip past the
+      // missed alarms so the next chime fires snoozeActive from "now", not
+      // immediately a bunch of times.
+      while (snoozeActive > 0 && nextAt <= elapsed) {
+        lastAlarmAtElapsed = nextAt;
+        nextAt = lastAlarmAtElapsed + snoozeActive;
+      }
     }
     const delaySec = Math.max(0, nextAt - elapsed);
     alarmTimeout = setTimeout(triggerAlarm, delaySec * 1000);
@@ -1216,10 +1554,17 @@
     void progressFill.offsetWidth;
     progressFill.style.transition = '';
     scheduleNextAlarm();
+    saveLiveState();
   }
 
   function dismissAlarm() {
     stopAlarmSound();
+    // Restart the snooze cycle from "now" so the user always gets a full
+    // snooze interval of quiet — and so a stale, imminent alarmTimeout that
+    // was already queued can't re-fire microseconds after the dismiss.
+    lastAlarmAtElapsed = elapsed;
+    scheduleNextAlarm();
+    saveLiveState();
     render();
   }
 
@@ -1230,6 +1575,7 @@
     releaseWakeLock();
     phase = 'setup';
     paused = false;
+    clearLiveState();
     // Reset pending interval to whatever the user has configured for next session.
     snoozePending = getInitialSnooze();
     snoozeActive = snoozePending;
@@ -1260,12 +1606,16 @@
       snoozePending = MIN_SNOOZE_SECONDS;
     }
     if (snoozePending === snoozeActive) { render(); return; }
+    // If the alarm is currently sounding when the user applies a new snooze,
+    // treat Apply as an implicit dismiss — silence the current alarm.
+    if (alarmSounding) stopAlarmSound();
     snoozeActive = snoozePending;
     settings.lastUsedSnooze = snoozeActive;
     saveSettings();
     // Restart the countdown to next alarm from "now".
     lastAlarmAtElapsed = elapsed;
     scheduleNextAlarm();
+    saveLiveState();
     render();
   }
 
@@ -1289,69 +1639,98 @@
   }
 
   function attachSegmentEditing(el, unit) {
-    // Note: pointer-down focus is handled by the unified clock-container drag/tap
-    // handler so a press-and-drag becomes a drag (not a focus). Tapping (no
-    // movement) calls el.focus() on release.
+    // Two input paths funnel into the same `applyDigit` helper:
+    //   - Desktop physical keyboard: keydown captures digits, preventDefault
+    //     stops native typing, applyDigit handles the buffer.
+    //   - Mobile soft keyboard: keydown is unreliable on Android, so we also
+    //     listen to the `input` event and route the new digit through
+    //     applyDigit. A `keydownHandled` flag prevents double-processing.
+    let buffer = '';
+    let keydownHandled = false;
+
+    function applyDigit(digit) {
+      buffer += digit;
+      if (buffer.length > 2) buffer = buffer.slice(-2);
+      const v = parseInt(buffer, 10);
+      const cap = unit === 'hr' ? 99 : 59;
+      const capped = Math.min(v, cap);
+      el.value = String(capped).padStart(2, '0');
+      try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {}
+      setSegment(unit, capped);
+      renderSegments();
+      if (buffer.length === 2) {
+        const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+        if (next) { buffer = ''; next.focus(); }
+      }
+    }
+
     el.addEventListener('focus', () => {
       if (phase !== 'setup') { el.blur(); return; }
-      editBuffer = '';
+      buffer = '';
+      try { el.select(); } catch (_) {}
     });
     el.addEventListener('blur', () => {
-      editBuffer = '';
-      // Re-render to ensure displayed value matches state (e.g. minimum-1-second).
+      buffer = '';
       if (setupSeconds < 1) setupSeconds = 1;
       render();
     });
     el.addEventListener('keydown', (e) => {
       if (phase !== 'setup') return;
+      keydownHandled = false;
       const key = e.key;
       if (key >= '0' && key <= '9') {
         e.preventDefault();
-        editBuffer += key;
-        if (editBuffer.length > 2) editBuffer = editBuffer.slice(-2);
-        let val = parseInt(editBuffer, 10);
-        const cap = unit === 'hr' ? 99 : 59;
-        if (val > cap) val = cap;
-        setSegment(unit, val);
-        renderSegments();
-        if (editBuffer.length === 2) {
-          // Auto-advance to next segment
-          const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
-          if (next) {
-            editBuffer = '';
-            next.focus();
-          }
-        }
+        applyDigit(key);
+        keydownHandled = true;
       } else if (key === 'ArrowUp') {
         e.preventDefault();
-        const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
-        adjustSetup(step);
-        editBuffer = '';
+        adjustSetup(unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1);
+        buffer = '';
+        keydownHandled = true;
       } else if (key === 'ArrowDown') {
         e.preventDefault();
-        const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
-        adjustSetup(-step);
-        editBuffer = '';
-      } else if (key === 'ArrowRight') {
-        e.preventDefault();
-        const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
-        if (next) next.focus();
+        adjustSetup(-(unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1));
+        buffer = '';
+        keydownHandled = true;
       } else if (key === 'ArrowLeft') {
         e.preventDefault();
         const prev = unit === 'sec' ? segMin : unit === 'min' ? segHr : null;
         if (prev) prev.focus();
+        keydownHandled = true;
+      } else if (key === 'ArrowRight') {
+        e.preventDefault();
+        const next = unit === 'hr' ? segMin : unit === 'min' ? segSec : null;
+        if (next) next.focus();
+        keydownHandled = true;
       } else if (key === 'Tab') {
-        editBuffer = '';
-        // let default tab behavior continue
+        buffer = '';
       } else if (key === 'Enter') {
         e.preventDefault();
         el.blur();
+        keydownHandled = true;
       } else if (key === 'Backspace' || key === 'Delete') {
         e.preventDefault();
-        editBuffer = '';
+        buffer = '';
         setSegment(unit, 0);
+        el.value = '00';
         renderSegments();
+        keydownHandled = true;
       }
+    });
+    el.addEventListener('input', () => {
+      if (phase !== 'setup') return;
+      if (keydownHandled) { keydownHandled = false; return; }
+      // Mobile soft-keyboard path: extract the most-recently-entered digit
+      // and route it through the same applyDigit logic the desktop uses.
+      const valDigits = (el.value || '').replace(/\D/g, '');
+      if (valDigits.length === 0) {
+        buffer = '';
+        setSegment(unit, 0);
+        el.value = '00';
+        renderSegments();
+        return;
+      }
+      applyDigit(valDigits.charAt(valDigits.length - 1));
     });
   }
   attachSegmentEditing(segHr, 'hr');
@@ -1362,15 +1741,35 @@
   // Editable in any phase. In setup/countdown, changes commit immediately;
   // in snooze they go into pending and need Apply.
   function attachSnoozeEditing(el, unit) {
-    el.addEventListener('focus', () => { snoozeEditBuffer = ''; });
-    el.addEventListener('blur', () => {
-      snoozeEditBuffer = '';
-      // Clamp pending to MIN_SNOOZE_SECONDS on commit
-      if (snoozePending < MIN_SNOOZE_SECONDS) {
-        snoozePending = MIN_SNOOZE_SECONDS;
+    let buffer = '';
+    let keydownHandled = false;
+
+    function applyDigit(digit) {
+      buffer += digit;
+      if (buffer.length > 2) buffer = buffer.slice(-2);
+      const v = parseInt(buffer, 10);
+      const cap = unit === 'hr' ? 99 : 59;
+      const capped = Math.min(v, cap);
+      el.value = String(capped).padStart(2, '0');
+      try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {}
+      const p = getParts(snoozePending);
+      p[unit] = capped;
+      setSnoozePending(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+      if (buffer.length === 2) {
+        const next = unit === 'hr' ? snoozeMin : unit === 'min' ? snoozeSec : null;
+        if (next) { buffer = ''; next.focus(); }
       }
-      const beforeOT = phase === 'setup' || (phase === 'running' && elapsed < totalSeconds);
-      if (beforeOT) {
+    }
+
+    el.addEventListener('focus', () => {
+      buffer = '';
+      try { el.select(); } catch (_) {}
+    });
+    el.addEventListener('blur', () => {
+      buffer = '';
+      if (snoozePending < MIN_SNOOZE_SECONDS) snoozePending = MIN_SNOOZE_SECONDS;
+      const beforeSnooze = phase === 'setup' || (phase === 'running' && elapsed < totalSeconds);
+      if (beforeSnooze) {
         snoozeActive = snoozePending;
         settings.lastUsedSnooze = snoozeActive;
         saveSettings();
@@ -1378,49 +1777,56 @@
       render();
     });
     el.addEventListener('keydown', (e) => {
+      keydownHandled = false;
       const key = e.key;
       if (key >= '0' && key <= '9') {
         e.preventDefault();
-        snoozeEditBuffer += key;
-        if (snoozeEditBuffer.length > 2) snoozeEditBuffer = snoozeEditBuffer.slice(-2);
-        let val = parseInt(snoozeEditBuffer, 10);
-        const cap = unit === 'hr' ? 99 : 59;
-        if (val > cap) val = cap;
-        const p = getParts(snoozePending);
-        p[unit] = val;
-        const total = p.hr * 3600 + p.min * 60 + p.sec;
-        // Allow temporarily-low values mid-typing; blur will clamp to MIN.
-        setSnoozePending(total, { allowSubMin: true });
-        if (snoozeEditBuffer.length === 2) {
-          const next = unit === 'hr' ? snoozeMin : unit === 'min' ? snoozeSec : null;
-          if (next) { snoozeEditBuffer = ''; next.focus(); }
-        }
+        applyDigit(key);
+        keydownHandled = true;
       } else if (key === 'ArrowUp' || key === 'ArrowDown') {
         e.preventDefault();
         const step = unit === 'hr' ? 3600 : unit === 'min' ? 60 : 1;
-        const delta = key === 'ArrowUp' ? step : -step;
-        setSnoozePending(snoozePending + delta);
-        snoozeEditBuffer = '';
+        setSnoozePending(snoozePending + (key === 'ArrowUp' ? step : -step));
+        buffer = '';
+        keydownHandled = true;
       } else if (key === 'ArrowLeft') {
         e.preventDefault();
         const prev = unit === 'sec' ? snoozeMin : unit === 'min' ? snoozeHr : null;
         if (prev) prev.focus();
+        keydownHandled = true;
       } else if (key === 'ArrowRight') {
         e.preventDefault();
         const next = unit === 'hr' ? snoozeMin : unit === 'min' ? snoozeSec : null;
         if (next) next.focus();
+        keydownHandled = true;
       } else if (key === 'Tab') {
-        snoozeEditBuffer = '';
+        buffer = '';
       } else if (key === 'Enter') {
         e.preventDefault();
         el.blur();
+        keydownHandled = true;
       } else if (key === 'Backspace' || key === 'Delete') {
         e.preventDefault();
-        snoozeEditBuffer = '';
+        buffer = '';
         const p = getParts(snoozePending);
         p[unit] = 0;
         setSnoozePending(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+        el.value = '00';
+        keydownHandled = true;
       }
+    });
+    el.addEventListener('input', () => {
+      if (keydownHandled) { keydownHandled = false; return; }
+      const valDigits = (el.value || '').replace(/\D/g, '');
+      if (valDigits.length === 0) {
+        buffer = '';
+        const p = getParts(snoozePending);
+        p[unit] = 0;
+        setSnoozePending(p.hr * 3600 + p.min * 60 + p.sec, { allowSubMin: true });
+        el.value = '00';
+        return;
+      }
+      applyDigit(valDigits.charAt(valDigits.length - 1));
     });
   }
   attachSnoozeEditing(snoozeHr, 'hr');
@@ -1466,7 +1872,12 @@
     }
     targetEl.addEventListener('mousedown', (e) => {
       if (!isEnabled()) return;
-      e.preventDefault();
+      // Don't preventDefault on inputs — that blocks native click-to-focus and
+      // makes desktop typing fail. Drag is still detected via mousemove
+      // threshold; if the user drags on an input we'll blur it then.
+      if (!e.target || e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+      }
       down(e.clientY, e.target);
     });
     window.addEventListener('mousemove', (e) => { if (startY !== null) move(e.clientY); });
@@ -1537,7 +1948,9 @@
     pickersBuilt = true;
   }
 
-  function openSettings() {
+  // Populate the Settings form fields from the current settings object.
+  // Called whenever the user navigates to the Settings tab.
+  function loadSettingsForm() {
     ensurePickersBuilt();
     pickerDefaultTimer.setValue(settings.defaultTimer);
     pickerDefaultSnooze.setValue(settings.defaultSnooze);
@@ -1547,9 +1960,7 @@
     chipsError.classList.add('hidden');
     defaultError.classList.add('hidden');
     defaultTmrError.classList.add('hidden');
-    settingsModal.classList.remove('hidden');
   }
-  function closeSettings() { settingsModal.classList.add('hidden'); }
 
   function validateAndSaveSettings() {
     const defTmr = pickerDefaultTimer.getValue();
@@ -1589,7 +2000,6 @@
     settings.useLastUsedSnooze = setUseLastSnooze.checked;
     settings.chips = chips;
     saveSettings();
-    closeSettings();
 
     // In setup phase, refresh displayed values to reflect new defaults.
     if (phase === 'setup') {
@@ -1609,17 +2019,184 @@
   document.getElementById('btn-stop-alarm').addEventListener('click', stopTimer);
   document.getElementById('btn-apply').addEventListener('click', applySnooze);
   document.getElementById('btn-cancel-apply').addEventListener('click', cancelSnooze);
-  document.getElementById('btn-settings').addEventListener('click', openSettings);
-  document.getElementById('btn-settings-cancel').addEventListener('click', closeSettings);
   document.getElementById('btn-settings-save').addEventListener('click', validateAndSaveSettings);
-  // Click-outside-modal-card closes the modal
-  settingsModal.addEventListener('click', (e) => {
-    if (e.target === settingsModal) closeSettings();
+
+  // --- Tab switching (Timer / Settings / About) ---
+  function switchScreen(name) {
+    if (!screens[name]) return;
+    Object.keys(screens).forEach(k => {
+      screens[k].classList.toggle('active', k === name);
+    });
+    tabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === name);
+    });
+    if (name === 'settings') loadSettingsForm();
+  }
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchScreen(btn.dataset.tab));
   });
 
+  // --- Changelog modal ---
+  function openChangelog() {
+    const text = (typeof window !== 'undefined' && window.CHANGELOG_TEXT)
+      ? window.CHANGELOG_TEXT
+      : '# Changelog\n\nNo changelog data in dev mode.\n\nRun `node build.js` to inject the real changelog.\n';
+    changelogBody.textContent = text;
+    changelogModal.classList.remove('hidden');
+  }
+  function closeChangelog() { changelogModal.classList.add('hidden'); }
+  document.getElementById('btn-show-changelog').addEventListener('click', openChangelog);
+  document.getElementById('btn-changelog-close').addEventListener('click', closeChangelog);
+  changelogModal.addEventListener('click', (e) => {
+    if (e.target === changelogModal) closeChangelog();
+  });
+
+  // --- Display app version on the About screen ---
+  aboutVersion.textContent = (typeof window !== 'undefined' && window.APP_VERSION)
+    ? window.APP_VERSION
+    : 'v0.0.0 (dev)';
+
+  // --- Pull-to-refresh ---
+  // Body has touch-action: none which kills the browser's native pull-to-refresh,
+  // so we wire up our own. Swipe down from above the clock face → reload page.
+  const prtIndicator = document.getElementById('prt-indicator');
+  const PRT_THRESHOLD = 80;
+  const PRT_DAMPEN = 0.5;
+  const PRT_VISUAL_MAX = 110;
+  let prtStartY = null;
+  let prtCurrentDy = 0;
+
+  function prtBlocked(target) {
+    if (!target || !target.closest) return false;
+    return !!(
+      target.closest('.clock-container') ||
+      target.closest('#snooze-section') ||
+      target.closest('.modal-card') ||
+      target.closest('.modal-backdrop') ||
+      target.closest('#footer-tabs') ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('.btn-row')
+    );
+  }
+  function prtReset() {
+    if (!prtIndicator) return;
+    prtIndicator.style.opacity = '';
+    prtIndicator.style.transform = '';
+    prtIndicator.classList.remove('ready');
+  }
+
+  // The pull-to-refresh hot zone is a thin strip across the top of the
+  // viewport (the area above the phase label / app chrome).
+  const PRT_ZONE_BOTTOM = 64; // px from top of viewport
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    // If any modal is open, skip.
+    if (!changelogModal.classList.contains('hidden')) return;
+    const y = e.touches[0].clientY;
+    if (y > PRT_ZONE_BOTTOM) return;
+    if (prtBlocked(e.target)) return;
+    prtStartY = y;
+    prtCurrentDy = 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (prtStartY === null) return;
+    const dy = e.touches[0].clientY - prtStartY;
+    if (dy < 0) {
+      // Swiped back up — abort
+      prtStartY = null;
+      prtReset();
+      return;
+    }
+    prtCurrentDy = dy;
+    if (prtIndicator) {
+      const visualOffset = Math.min(dy * PRT_DAMPEN, PRT_VISUAL_MAX);
+      prtIndicator.style.opacity = Math.min(1, dy / PRT_THRESHOLD);
+      prtIndicator.style.transform = 'translate(-50%, ' + visualOffset + 'px)';
+      prtIndicator.classList.toggle('ready', dy >= PRT_THRESHOLD);
+    }
+  }, { passive: true });
+
+  function prtFinish() {
+    if (prtStartY === null) return;
+    const triggered = prtCurrentDy >= PRT_THRESHOLD;
+    prtStartY = null;
+    prtCurrentDy = 0;
+    if (triggered) {
+      // Leave the indicator visible during the reload flash.
+      location.reload();
+    } else {
+      prtReset();
+    }
+  }
+  document.addEventListener('touchend', prtFinish);
+  document.addEventListener('touchcancel', () => {
+    prtStartY = null;
+    prtCurrentDy = 0;
+    prtReset();
+  });
+
+  // Save the live timer state on tab-hide / page-unload so a refresh can resume.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveLiveState();
+  });
+  window.addEventListener('pagehide', saveLiveState);
+
+  // --- Resume from saved state, if any ---
+  function tryRestoreLiveState() {
+    const s = loadLiveState();
+    if (!s) return false;
+
+    totalSeconds = Math.max(1, s.totalSeconds | 0);
+    setupSeconds = totalSeconds;
+    snoozeActive = Math.max(MIN_SNOOZE_SECONDS, s.snoozeActive | 0);
+    snoozePending = Math.max(MIN_SNOOZE_SECONDS, s.snoozePending | 0);
+    lastAlarmAtElapsed = Math.max(0, s.lastAlarmAtElapsed | 0);
+    paused = !!s.paused;
+
+    if (paused) {
+      elapsed = Math.max(0, s.elapsedAtSave | 0);
+    } else {
+      const dtSec = Math.max(0, (Date.now() - s.lastSaveMs) / 1000);
+      elapsed = Math.max(0, Math.floor((s.elapsedAtSave || 0) + dtSec));
+    }
+
+    phase = 'running';
+    // Refresh implicitly dismisses any alarm that was sounding (Web Audio
+    // doesn't survive a reload anyway). The user resumes in the snoozing
+    // state with a clean cycle ahead.
+    alarmSounding = false;
+
+    if (!paused) {
+      requestWakeLock();
+      timerInterval = setInterval(() => {
+        elapsed++;
+        // Save every tick is overkill, but cheap. Actually we only really need
+        // it on state changes — the next-render pulls fresh `elapsed` from the
+        // tick counter and the `(now - lastSaveMs)` math handles in-between.
+        render();
+      }, 1000);
+      scheduleNextAlarm();
+    }
+    return true;
+  }
+
   // --- Init ---
+  if (!tryRestoreLiveState()) {
+    // No saved state: stay in setup mode and load the default/last-used timer.
+  }
   render();
 })();
+
+// --- PWA service worker registration ---
+// SW only runs over https or localhost, so file:// local-dev silently no-ops.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

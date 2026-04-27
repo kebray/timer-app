@@ -3,9 +3,10 @@
 A single-file countdown / count-up "snooze" timer web app. Designed for *activity timing* (e.g. "spend 10 minutes cleaning, then snooze for 5 more if I need it"), not for snoozing a sleep alarm.
 
 ## Architecture
-- **Single `index.html`** — all HTML, CSS, JS inline. No build step, no dependencies, no bundler. Vanilla JS only.
+- **Single `index.html`** — all HTML, CSS, JS inline. Vanilla JS only, no frameworks, no bundler.
+- **Minimal Node build step** (~30 LOC, zero npm dependencies) that injects the version string and the changelog text into a fresh copy of `index.html` written to `dist/`. Netlify runs `node build.js` and serves `dist/`.
+- For local dev: just open `index.html` directly in a browser. The build step is skipped — version shows as `v0.0.0 (dev)` and the changelog modal shows a placeholder. To preview the production output locally, run `node build.js` and open `dist/index.html`.
 - Must run in all major browsers (Chrome, Firefox, Safari, Edge — desktop and mobile).
-- To run locally: open `index.html` directly in a browser.
 
 ## Core Concepts
 - **Timer** — the user-set countdown duration (the "main" timer). Range: 1 second to 99:59:59.
@@ -104,16 +105,101 @@ Gear icon in the top-right corner opens a modal containing:
 - **GitHub repo**: [`kebray/timer-app`](https://github.com/kebray/timer-app) (public).
 - **Netlify site**: `kebray-app-timer` — https://kebray-app-timer.netlify.app
 - **Netlify admin**: https://app.netlify.com/projects/kebray-app-timer
-- **Build**: none. Publish dir: `/`.
-- **Auto-deploy on push**: the site is linked to the repo in the Netlify dashboard, but GitHub webhooks aren't firing on push (last automatic deploy never happened — only CLI deploys). Likely cause: the Netlify GitHub App isn't fully authorized on the repo; check https://github.com/settings/installations and reinstall on `kebray/timer-app` if Netlify is missing or its access is limited. Manual fallback: `netlify deploy --prod --dir=.`
+- **Build command**: `node scripts/build.js`. **Publish dir**: `dist/`. Configured via `netlify.toml`.
+- **Auto-deploy on push**: live. The Netlify GitHub App is installed with access to all repos under `kebray`, and the repo is linked under `Continuous deployment`. Each push to `main` triggers a build that runs `node scripts/build.js` and publishes `dist/`.
+- Manual fallback: `node scripts/build.js && netlify deploy --prod --dir=dist`
+
+## UI shell (Tabs)
+
+The app is a three-tab single-page UI:
+
+```
+┌────────────────────────────────────────┐
+│ <main #screens>                        │
+│   ┌──────────────────────────────────┐ │
+│   │ #screen-timer    (active class)  │ │  ← only one .screen.active at a time
+│   ├──────────────────────────────────┤ │
+│   │ #screen-settings (hidden)        │ │
+│   ├──────────────────────────────────┤ │
+│   │ #screen-about    (hidden)        │ │
+│   └──────────────────────────────────┘ │
+├────────────────────────────────────────┤
+│ <nav #footer-tabs>                     │  ← fixed bottom, ~60px tall
+│   [Timer] [Settings] [About]           │
+└────────────────────────────────────────┘
+```
+
+`switchScreen(name)` toggles the `.active` class on screens and tab buttons. Switching to Settings calls `loadSettingsForm()` to repopulate the form from the current `settings` object. Switching to About is a no-op (the version is set once at init).
+
+The previous gear icon in the top-right is gone; Settings is reached via the footer.
+
+The **changelog modal** is a separate floating popup (modal-backdrop pattern), opened from the About screen's "View Changelog" button.
+
+## Build / version / changelog
+
+- **`version.txt`** — manual semver string. Bump for releases (`0.1.0` → `0.2.0`, etc.).
+- **`CHANGELOG.md`** — Keep-a-Changelog-style file. Edit by hand; the build embeds it verbatim into the app.
+- **`scripts/build.js`** — reads `version.txt`, `CHANGELOG.md`, and `git rev-list --count HEAD` (build number = total commits). Writes `dist/index.html` with a small injected `<script>` that defines `window.APP_VERSION` and `window.CHANGELOG_TEXT` just before the in-page `<script>`. Also copies everything in `public/` into `dist/` (with the `__BUILD_ID__` token in `sw.js` substituted). Anchored to `__dirname` so cwd doesn't matter.
+- **`netlify.toml`** — `command = "node scripts/build.js"`, `publish = "dist"`.
+- The app reads `window.APP_VERSION` (with a `'v0.0.0 (dev)'` fallback for local) and displays it on the About screen. The changelog modal renders `window.CHANGELOG_TEXT` as preformatted text.
+- Auto-incrementing: every push → new commit → bigger commit count → new build number → new version label on the next Netlify deploy.
+
+## PWA
+
+The app is a Progressive Web App, installable from the browser ("Add to Home Screen" on mobile, install prompt on desktop Chrome/Edge).
+
+- **`public/manifest.webmanifest`** — name, icons, `display: standalone`, theme/background colors. Linked from `<head>` via `<link rel="manifest">`.
+- **`public/icon.svg`** — single-file SVG icon (gold ring + clock hands on dark background, 512×512 viewBox). Manifest declares both `purpose: any` and `purpose: maskable`. iOS doesn't fully render SVG for `apple-touch-icon` — accept the limitation for now (a PNG export could be added later).
+- **`public/sw.js`** — minimal service worker. On install, caches the app shell (`./`, `index.html`, `manifest.webmanifest`, `icon.svg`). Strategy: **network-first** for navigation requests (so deploys propagate on next reload), **cache-first** for static assets, falls back to cache when offline.
+- **`__BUILD_ID__`** in `public/sw.js` is replaced by `scripts/build.js` with `app-timer-${version}-${build}` — each deploy invalidates the old cache via the activate handler.
+- Apple meta tags (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style="black-translucent"`, etc.) are set so iOS standalone mode looks right.
+- Service worker registration is gated on `'serviceWorker' in navigator` and runs on `load` — silently no-ops on `file://` (local dev). It only activates over https or localhost.
+
+## Future architecture: React rewrite plan (deferred)
+
+When TODO #1 (multiple timers) lands, that's the natural inflection point to rewrite. Until then, the vanilla HTML+JS stays.
+
+**Recommended stack at rewrite time:**
+- **React 19 + TypeScript** — components and hooks make multi-timer state much cleaner than hand-managed vanilla; TS catches bugs.
+- **Vite + `vite-plugin-pwa`** — replaces the current hand-rolled `sw.js` with a more capable Workbox-based service worker; handles asset hashing, precaching, etc.
+- **Plain CSS** (or CSS modules) — Tailwind is optional and not needed; current CSS volume is small.
+
+**Skip during the rewrite (add later only if a specific need shows up):**
+- ~~Tailwind CSS~~ — current styles are fine; Tailwind doesn't earn its weight here.
+- ~~Dexie.js / IndexedDB~~ — `localStorage` covers the data we have. Switch to Dexie when the data outgrows it (e.g., per-timer history with notes, large audit logs).
+- ~~React Router~~ — three tabs = `useState`. Add only when the app grows real navigation depth.
+
+**Migration approach (high level):**
+1. Scaffold Vite + React + TS in a new branch. Get a "Hello, App Timer" rendering.
+2. Port the timer logic (the IIFE in `index.html`) into a hook (`useTimer`) — pure functions stay pure.
+3. Port screens one at a time: Timer → Settings → About → Changelog modal.
+4. Reuse the existing `CHANGELOG.md` / `version.txt` — Vite can read them via `import` or a small build plugin.
+5. Replace the hand-rolled `sw.js` with `vite-plugin-pwa`'s generated SW, keeping the same network-first/cache-first strategy and manifest content.
+6. Update `netlify.toml` build command to `npm run build` and publish dir to `dist/` (Vite's default).
 
 ## File Structure
 ```
 timer-app/
-  index.html    # The entire app
-  CLAUDE.md     # This file (Claude-focused dev notes)
-  README.md     # Public-facing project README
+  index.html              # App source (template; picks up window.APP_VERSION/CHANGELOG_TEXT if present)
+  version.txt             # Manual semver (bump for releases)
+  CHANGELOG.md            # Embedded into the app at build time
+  netlify.toml            # build = "node scripts/build.js", publish = "dist"
+  README.md               # Public-facing project README
+  CLAUDE.md               # This file (Claude-focused dev notes)
+  .gitignore
+
+  scripts/
+    build.js              # Node build script (zero deps)
+
+  public/                 # Static assets copied verbatim to dist/ (sw.js gets a build-id substitution)
+    manifest.webmanifest  # PWA manifest
+    icon.svg              # PWA icon (single SVG, 512x512 viewBox)
+    sw.js                 # PWA service worker
+
+  dist/                   # Build output (gitignored)
 ```
+
+Anything new and static (favicons, additional icon sizes, robots.txt, etc.) goes in `public/` and gets copied to `dist/` automatically — no `build.js` change needed unless the file needs templated substitution.
 
 ## TODOs
 1. **Multiple timers** — support running several named timers at once (Pixel-Timer-style cards). Major refactor: current code assumes a single global timer.
@@ -125,5 +211,5 @@ timer-app/
 4. **Mac desktop app with menubar countdown** — the menubar countdown is the killer feature and *requires* native shim work. Recommended starting point: Tauri (small bundle, easy menubar APIs, can host the existing `index.html` in the main window while a native menubar item shows the countdown). Alternative: Electron + menubar plugin or native Swift app.
 5. **Material You / Material 3 design system** — *clarify scope before starting*: would replace the current dark-gold visual identity. Probably scoped to the Android version only (#3); leave the web app's current theme alone.
 6. **Refactor for reusable components and performance** — concrete sub-tasks: (a) extract `buildHmsPicker`, `bindDragInput`, audio engine, and settings store into clearly delineated modules within the file (or split files if we abandon the no-build-step constraint); (b) audit `render()` for unnecessary DOM writes; (c) memoize chip rendering instead of rebuilding the row every render.
-7. **Automated tests gating deploys** — set up `tests/` folder with Vitest for pure-function unit tests + Playwright for E2E. Trade-off: introduces a build/test toolchain that violates the current "no build, no dependencies" architecture rule for the *app* — keep test deps isolated to `tests/` so the app stays single-file. Wire into a GitHub Actions workflow that blocks the Netlify deploy on test failure.
-8. **Public README.md** — done. Iterate from there.
+7. **Automated tests gating deploys** — set up `tests/` folder with Vitest for pure-function unit tests + Playwright for E2E. Wire into a GitHub Actions workflow that blocks the Netlify deploy on test failure. Test deps stay in `tests/` so the app source remains a single HTML file (the only build dep so far is the tiny `node build.js`).
+8. ~~**Public README.md**~~ — done (`README.md`). Iterate from there.
