@@ -54,17 +54,25 @@
   }
   .screen.active { display: flex; }
 
-  /* Bottom padding has to clear the fixed footer (~60px) AND the iOS home-
-     indicator safe-area, otherwise content sits under the tab bar. */
-  /* The Timer screen is top-aligned: when content (clock + totals + buttons
-     + snooze + apply) is taller than the viewport (e.g. iPhone Pro Max in
-     portrait + Safari toolbars), top-align lets it scroll properly. With
-     center-justify, overflow gets clipped both above and below. About is
-     short enough to stay center-justified. Settings is naturally tall. */
+  /* Bottom padding clears the fixed footer (~60px) plus the iOS home-
+     indicator safe-area so content never sits under the tab bar. */
   #screen-timer {
     align-items: center;
-    justify-content: flex-start;
     padding: 1.25rem 1rem calc(5.5rem + env(safe-area-inset-bottom, 0));
+  }
+  /* Center the timer content vertically when it fits, and scroll-from-top
+     when it doesn't (e.g. iPhone Pro Max portrait with Safari toolbars +
+     full snoozing UI showing). The trick: outer flex column + overflow-y:
+     auto, inner with margin: auto. When there's spare vertical space the
+     auto margins absorb it equally, centering the content; when content
+     overflows, the auto margins collapse to 0 and overflow scrolls
+     naturally — keeping the apply / cancel buttons reachable. */
+  #screen-timer .screen-content {
+    margin: auto 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
   }
   #screen-about {
     align-items: center;
@@ -165,15 +173,23 @@
     margin-bottom: 1rem;
   }
   .about-link {
-    margin-top: 1rem;
+    margin-top: 2.5rem;
     color: var(--dim);
     text-decoration: none;
     font-size: 0.85rem;
+    transition: color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .about-link-icon { flex-shrink: 0; }
+  .about-link-text {
     border-bottom: 1px dotted var(--dim);
     padding-bottom: 1px;
-    transition: color 0.15s, border-color 0.15s;
+    transition: border-color 0.15s;
   }
-  .about-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+  .about-link:hover { color: var(--gold); }
+  .about-link:hover .about-link-text { border-bottom-color: var(--gold); }
 
   /* --- Changelog modal body --- */
   .changelog-body {
@@ -408,6 +424,33 @@
     transform: rotate(-90deg);
     transform-origin: center;
     transition: stroke-dashoffset 0.5s linear, stroke 0.4s;
+  }
+
+  /* --- Toast (top-of-screen status pill) --- */
+  #toast {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translate(-50%, -150%);
+    background: rgba(232, 184, 75, 0.96);
+    color: var(--bg);
+    padding: 0.65rem 1.1rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 300;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    transition: transform 0.3s ease, opacity 0.25s ease;
+    opacity: 0;
+    pointer-events: none;
+    max-width: 90%;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+  #toast.visible {
+    transform: translate(-50%, 0);
+    opacity: 1;
   }
 
   /* --- Pull-to-refresh indicator --- */
@@ -695,10 +738,13 @@
   </svg>
 </div>
 
+<div id="toast" role="status" aria-live="polite"></div>
+
 <main id="screens">
 
   <!-- ============ TIMER SCREEN ============ -->
   <section class="screen active" id="screen-timer">
+   <div class="screen-content">
     <div id="phase-label">set your timer</div>
     <div class="timer-original hidden" id="timer-original">Timer: <span class="v" id="timer-original-val">00:00</span></div>
 
@@ -775,6 +821,7 @@
       <button class="btn" id="btn-cancel-apply">Cancel</button>
       <button class="btn primary" id="btn-apply">Apply New Snooze</button>
     </div>
+   </div>
   </section>
 
   <!-- ============ SETTINGS SCREEN ============ -->
@@ -833,7 +880,12 @@
       <div class="about-version" id="about-version">v0.0.0 (dev)</div>
       <button class="btn" id="btn-show-changelog">View Changelog</button>
       <button class="btn" id="btn-check-updates">Check for Updates</button>
-      <a class="about-link" href="https://github.com/kebray/timer-app" target="_blank" rel="noreferrer noopener">View source on GitHub</a>
+      <a class="about-link" href="https://github.com/kebray/timer-app" target="_blank" rel="noreferrer noopener">
+        <svg class="about-link-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        <span class="about-link-text">View source on GitHub</span>
+      </a>
     </div>
   </section>
 
@@ -2081,6 +2133,10 @@
   document.getElementById('btn-settings-reset').addEventListener('click', resetSettingsToDefaults);
 
   // --- Tab switching (Timer / Settings / About) ---
+  // Persisted in sessionStorage so a page reload (e.g. Check for Updates)
+  // lands the user back on the same tab. sessionStorage rather than
+  // localStorage so opening the app fresh still defaults to Timer.
+  const ACTIVE_TAB_KEY = 'app-timer-active-tab';
   function switchScreen(name) {
     if (!screens[name]) return;
     Object.keys(screens).forEach(k => {
@@ -2090,10 +2146,36 @@
       btn.classList.toggle('active', btn.dataset.tab === name);
     });
     if (name === 'settings') loadSettingsForm();
+    try { sessionStorage.setItem(ACTIVE_TAB_KEY, name); } catch (_) {}
+  }
+  function restoreActiveTab() {
+    let name = 'timer';
+    try {
+      const stored = sessionStorage.getItem(ACTIVE_TAB_KEY);
+      if (stored && screens[stored]) name = stored;
+    } catch (_) {}
+    if (name !== 'timer') switchScreen(name);
   }
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => switchScreen(btn.dataset.tab));
   });
+
+  // --- Toast (top-of-screen status pill) ---
+  const toastEl = document.getElementById('toast');
+  let toastHideTimer = null;
+  let toastClassTimer = null;
+  function showToast(message, durationMs) {
+    if (!toastEl) return;
+    if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+    if (toastClassTimer) { clearTimeout(toastClassTimer); toastClassTimer = null; }
+    toastEl.textContent = message;
+    // Force reflow so the transition runs from the hidden state.
+    void toastEl.offsetWidth;
+    toastEl.classList.add('visible');
+    toastHideTimer = setTimeout(() => {
+      toastEl.classList.remove('visible');
+    }, durationMs || 2500);
+  }
 
   // --- Changelog modal ---
   function openChangelog() {
@@ -2105,17 +2187,60 @@
   }
   function closeChangelog() { changelogModal.classList.add('hidden'); }
   document.getElementById('btn-show-changelog').addEventListener('click', openChangelog);
-  document.getElementById('btn-check-updates').addEventListener('click', () => {
-    // Same effect as the pull-to-refresh gesture. We also poke the service
-    // worker so it pulls a fresh sw.js (and any new asset cache) before the
-    // reload, otherwise a stale SW could still serve cached HTML.
+  // --- Check for Updates ---
+  // Click → show "Checking…" on the button, nudge the SW to fetch a fresh
+  // sw.js + asset cache, save flags so we can detect the result after
+  // reload, then reload. After reload, the init code reads the flags and
+  // either toasts "Updated to v… (build N)" or "You're up to date."
+  const UPDATE_CHECK_KEY = 'app-timer-update-check';
+  const VERSION_PRIOR_KEY = 'app-timer-version-prior';
+  const btnCheckUpdates = document.getElementById('btn-check-updates');
+  btnCheckUpdates.addEventListener('click', async () => {
+    btnCheckUpdates.disabled = true;
+    const originalText = btnCheckUpdates.textContent;
+    btnCheckUpdates.textContent = 'Checking\u2026';
+    const tasks = [];
     if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
-      navigator.serviceWorker.getRegistration().then((reg) => {
-        if (reg && reg.update) { try { reg.update(); } catch (_) {} }
-      }).catch(() => {});
+      tasks.push(
+        navigator.serviceWorker.getRegistration()
+          .then((reg) => (reg && reg.update) ? reg.update() : null)
+          .catch(() => {})
+      );
     }
+    // Min 600ms so the "Checking…" state is visible even on fast networks.
+    tasks.push(new Promise((r) => setTimeout(r, 600)));
+    try { await Promise.all(tasks); } catch (_) {}
+    try {
+      sessionStorage.setItem(UPDATE_CHECK_KEY, '1');
+      sessionStorage.setItem(VERSION_PRIOR_KEY, window.APP_VERSION || '');
+      // Make sure the post-reload init lands back on the About tab.
+      sessionStorage.setItem(ACTIVE_TAB_KEY, 'about');
+    } catch (_) {}
     location.reload();
+    // Failsafe in case reload is somehow blocked.
+    setTimeout(() => {
+      btnCheckUpdates.disabled = false;
+      btnCheckUpdates.textContent = originalText;
+    }, 4000);
   });
+
+  function maybeShowUpdateToast() {
+    let started = null;
+    let prior = null;
+    try {
+      started = sessionStorage.getItem(UPDATE_CHECK_KEY);
+      prior = sessionStorage.getItem(VERSION_PRIOR_KEY);
+      sessionStorage.removeItem(UPDATE_CHECK_KEY);
+      sessionStorage.removeItem(VERSION_PRIOR_KEY);
+    } catch (_) {}
+    if (!started) return;
+    const current = window.APP_VERSION || 'v0.0.0 (dev)';
+    if (prior && prior !== current) {
+      showToast('Updated to ' + current, 4000);
+    } else {
+      showToast("You're up to date \u00b7 " + current, 2400);
+    }
+  }
   document.getElementById('btn-changelog-close').addEventListener('click', closeChangelog);
   changelogModal.addEventListener('click', (e) => {
     if (e.target === changelogModal) closeChangelog();
@@ -2258,6 +2383,8 @@
     // No saved state: stay in setup mode and load the default/last-used timer.
   }
   render();
+  restoreActiveTab();      // honor the persisted tab (e.g. About after Check-for-Updates)
+  maybeShowUpdateToast();  // toast result of a pending Check-for-Updates, if any
 })();
 
 // --- PWA service worker registration ---

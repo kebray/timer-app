@@ -2,10 +2,23 @@
 
 All notable changes to App Timer are recorded here. Newest at the top.
 
+## v0.1.2 — 2026-04-27
+
+### Added
+- GitHub icon next to the **View source on GitHub** link on the About screen.
+- Toast confirmation after **Check for Updates** — "Updated to vX.Y.Z (build N)" if a new build was pulled, or "You're up to date · vX.Y.Z (build N)" if nothing changed. The button briefly shows "Checking…" while the service worker probes for an update.
+- Active tab is now persisted across page reloads (sessionStorage). After Check for Updates the user lands back on the About tab instead of bouncing to Timer.
+
+### Changed
+- Layout fixes for tall-content phones (iPhone Pro Max class): the Timer screen now top-aligns and scrolls when its content exceeds the viewport, so the **Apply New Snooze** / **Cancel** buttons can never be hidden behind the bottom tab bar. Bottom padding now accounts for the iOS home-indicator safe area.
+- Button rows wrap to multiple lines when the viewport is too narrow to fit them side-by-side.
+- Tighter vertical rhythm on mobile (smaller margins around the phase label, totals, divider, and snooze section) so more of the timer UI fits without scrolling.
+- The "View source on GitHub" link now sits with a bit more breathing room above it on the About page.
+
 ## v0.1.0 — 2026-04-26
 
 ### Added
-- **Check for Updates** button on the About screen — equivalent to the pull-to-refresh gesture: nudges the service worker to fetch a fresh `sw.js` and asset cache, then reloads the page so any new build takes effect.
+- **Check for Updates** button on the About screen — nudges the service worker to fetch a fresh `sw.js` and asset cache, briefly shows "Checking…" on the button, then reloads. After the reload the user lands back on the About tab (the active tab is persisted in sessionStorage across reloads) and a toast appears: **"Updated to vX.Y.Z (build N)"** if a new version was pulled, or **"You're up to date · vX.Y.Z (build N)"** if nothing changed.
 - **Reset to Defaults** button at the bottom of Settings — wipes saved settings (default timer, default snooze, chip values, last-used toggles) and re-applies the built-in defaults.
 - Settings → **Save** now returns you to the Timer tab automatically.
 - **Progressive Web App support** — installable from browser ("Add to Home Screen" on mobile, install prompt on desktop Chrome/Edge). Includes a web app manifest, an SVG app icon, and a minimal service worker for offline use of the cached app shell. Each deploy gets a fresh cache via build-id-based cache versioning.
