@@ -55,13 +55,15 @@
   .screen.active { display: flex; }
 
   /* Timer + About center their content. Settings is top-anchored + scrollable. */
+  /* Bottom padding has to clear the fixed footer (~60px) AND the iOS home-
+     indicator safe-area, otherwise content sits under the tab bar. */
   #screen-timer, #screen-about {
     align-items: center;
     justify-content: center;
-    padding: 1rem 1rem 5rem;
+    padding: 1rem 1rem calc(5rem + env(safe-area-inset-bottom, 0));
   }
   #screen-settings {
-    padding: 1.5rem 1rem 5rem;
+    padding: 1.5rem 1rem calc(5rem + env(safe-area-inset-bottom, 0));
   }
   #screen-settings .screen-content {
     width: 100%;
@@ -338,7 +340,10 @@
   .btn-row {
     margin-top: 2rem;
     display: flex;
-    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem 1rem;
+    max-width: 100%;
   }
 
   .btn {
